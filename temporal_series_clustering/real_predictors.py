@@ -1,8 +1,7 @@
 import string
 
 from temporal_series_clustering.cluster.algorithms.dbscan import dbscan_cluster
-from temporal_series_clustering.cluster.algorithms.epsilon_paths import epsilon_paths_clustering
-from temporal_series_clustering.cluster.algorithms.min_path import min_path_clustering
+from temporal_series_clustering.cluster.algorithms.mean_cycle import mean_cycle_clustering
 from temporal_series_clustering.cluster.clustering import temporal_clustering
 from temporal_series_clustering.cluster.utils import store_clusters_json
 from temporal_series_clustering.patterns.generators import create_simulation_weeks, predictor_city
@@ -44,42 +43,20 @@ def clusterize_real_predictors():
     instant_sheaf_models = {instant: create_simplified_sheaf_model(num_vertices, filtration[instant]) for instant in
                             range(len(filtration))}
 
-    # clusters = clustering_algorithm(filtration, base_vertices=base_vertices)
-    min_path_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices,
-                                            algorithm=min_path_clustering,
-                                            epsilon=0.07)
+    # Try clustering with mean edge loop algorithm
+    mean_edge_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices,
+                                             algorithm=mean_cycle_clustering,
+                                             epsilon=0.07)
 
     clusters_data = {}
 
     # Also append to clusters the predictions and the consistencies
-    for k, v in min_path_clusters.items():
+    for k, v in mean_edge_clusters.items():
         clusters_data[k] = {'clusters': v,
                             'predictions': [predictor[k] for predictor in predictors_output],
                             'consistencies': dict(sorted(filtration[k].items()))}
 
-    store_clusters_json(clusters_data, '../clusters/min_path.json')
-
-    """
-    for k, v in min_path_clusters.items():
-        print(f"Predictors output are {[predictor[k] for predictor in predictors_output]} ")
-        print(f"Consistencies are: {filtration[k]}")
-        print(f"{k}: {v}\n")
-        if k == 2:
-            break
-    """
-
-    epsilon_paths_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices,
-                                                 algorithm=epsilon_paths_clustering, epsilon=0.07)
-
-    clusters_data = {}
-
-    # Also append to clusters the predictions and the consistencies
-    for k, v in epsilon_paths_clusters.items():
-        clusters_data[k] = {'clusters': v,
-                            'predictions': [predictor[k] for predictor in predictors_output],
-                            'consistencies': dict(sorted(filtration[k].items()))}
-
-    store_clusters_json(clusters_data, '../clusters/epsilon_paths.json')
+    store_clusters_json(clusters_data, '../clusters/mean_edge.json')
 
     # Try the clustering with DBSCAN
     dbscan_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices, algorithm=dbscan_cluster,

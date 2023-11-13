@@ -49,3 +49,10 @@ def find_common_items(cluster_dict):
     common_items = {k: v['cluster'] for k, v in counts.items() if v['count'] >= 2}
 
     return common_items
+
+
+def find_key_of_item(item, dictionary):
+    for key, value in dictionary.items():
+        if any(item in sublist for sublist in value):
+            return key
+    return None
