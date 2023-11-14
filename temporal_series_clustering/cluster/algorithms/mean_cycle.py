@@ -88,7 +88,29 @@ def mean_cycle_clustering(G: nx.MultiDiGraph, **kwargs) -> dict:
                 # Add the cycle to the clusters
                 clusters[updated_cycle[0]] = updated_cycle
 
-    return clusters
+    # Define the clusters info dict
+    clusters_info = {'value': {}, 'mean': None}
+
+    # Iterate over the clusters to get the mean consistency for a given instant
+    for k, cluster in clusters.items():
+        # Get consistencies of the cluster
+        cluster_consistencies = get_consistencies_cycle(cluster, consistency_dict)
+        # Calculate the mean value of the consistency. If not valid set infinite as we search the minimum
+        mean_consistency_cluster = sum(cluster_consistencies) / len(cluster_consistencies) if cluster_consistencies \
+            else None
+        clusters_info['value'][k] = {
+            'nodes': cluster,
+            'mean': mean_consistency_cluster
+        }
+
+    # Retrieve the mean values for each clusters
+    mean_clusters_values = [v['mean'] for k, v in clusters_info['value'].items() if v['mean']]
+
+    # Calculate the overall mean of a given instant
+    clusters_info['mean'] = sum(mean_clusters_values) / len(mean_clusters_values) if len(mean_clusters_values) > 0 \
+        else None
+
+    return clusters_info
 
 
 def get_consistencies_cycle(cycle: list, consistencies_dict: dict) -> list:

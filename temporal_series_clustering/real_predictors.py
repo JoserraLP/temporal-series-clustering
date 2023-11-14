@@ -8,6 +8,7 @@ from temporal_series_clustering.patterns.generators import create_simulation_wee
 from temporal_series_clustering.sheaf.sheaf_model import create_sheaf_model, create_simplified_sheaf_model
 from temporal_series_clustering.sheaf.utils import propagate_sheaf_values
 from temporal_series_clustering.static.constants import NUM_WEEKS, ITEMS_PER_DAY
+from temporal_series_clustering.static.utils import process_clusters
 
 
 def clusterize_real_predictors():
@@ -43,18 +44,12 @@ def clusterize_real_predictors():
     instant_sheaf_models = {instant: create_simplified_sheaf_model(num_vertices, filtration[instant]) for instant in
                             range(len(filtration))}
 
-    # Try clustering with mean edge loop algorithm
     mean_edge_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices,
                                              algorithm=mean_cycle_clustering,
                                              epsilon=0.07)
 
-    clusters_data = {}
-
-    # Also append to clusters the predictions and the consistencies
-    for k, v in mean_edge_clusters.items():
-        clusters_data[k] = {'clusters': v,
-                            'predictions': [predictor[k] for predictor in predictors_output],
-                            'consistencies': dict(sorted(filtration[k].items()))}
+    clusters_data = process_clusters(clusters=mean_edge_clusters, predictions=predictors_output,
+                                     consistencies=filtration)
 
     store_clusters_json(clusters_data, '../clusters/mean_edge.json')
 
@@ -62,13 +57,8 @@ def clusterize_real_predictors():
     dbscan_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices, algorithm=dbscan_cluster,
                                           epsilon=0.07)
 
-    clusters_data = {}
-
-    # Also append to clusters the predictions and the consistencies
-    for k, v in dbscan_clusters.items():
-        clusters_data[k] = {'clusters': v,
-                            'predictions': [predictor[k] for predictor in predictors_output],
-                            'consistencies': dict(sorted(filtration[k].items()))}
+    clusters_data = process_clusters(clusters=dbscan_clusters, predictions=predictors_output,
+                                     consistencies=filtration)
 
     store_clusters_json(clusters_data, '../clusters/dbscan.json')
 
