@@ -1,6 +1,7 @@
 import numpy as np
 
 from temporal_series_clustering.static.constants import TEMPORAL_PATTERN_FILES, ITEMS_PER_DAY
+from scipy import interpolate
 
 import pandas as pd
 
@@ -70,12 +71,40 @@ def create_simulation_days(predictor, num_days):
 def create_simulation_weeks(predictor, place_id, num_weeks):
     simulation_normal_vol = []
     for _ in range(num_weeks):
-        simulation_normal_vol.extend([predictor(place_id=place_id, weekday="weekday", hour=hour, location="") for hour in
-                                      range(ITEMS_PER_DAY)] * 5)
-        simulation_normal_vol.extend([predictor(place_id=place_id, weekday="saturday", hour=hour, location="") for hour in
-                                      range(ITEMS_PER_DAY)])
+        simulation_normal_vol.extend(
+            [predictor(place_id=place_id, weekday="weekday", hour=hour, location="") for hour in
+             range(ITEMS_PER_DAY)] * 5)
+        simulation_normal_vol.extend(
+            [predictor(place_id=place_id, weekday="saturday", hour=hour, location="") for hour in
+             range(ITEMS_PER_DAY)])
         simulation_normal_vol.extend([predictor(place_id=place_id, weekday="sunday", hour=hour, location="") for hour in
                                       range(ITEMS_PER_DAY)])
 
     return simulation_normal_vol
 
+
+def interpolate_time_serie(time_serie: list, num_points: int) -> list:
+    """
+    Interpolate the input time serie, adding the number of items by parameters between each pair of values
+
+    :param time_serie: time series values
+    :type time_serie: list
+    :param num_points: number of points between two pairs on the time serie
+    :type num_points: int
+    :return: interpolated time serie
+    :rtype: list
+    """
+
+    # Create an array of times corresponding to your values
+    times = np.arange(len(time_serie))
+
+    # Create a cubic spline interpolation function
+    f = interpolate.interp1d(times, time_serie, kind='cubic')
+
+    # Create a new array of times with the number of points between each pair of original points
+    new_times = np.linspace(0, len(time_serie) - 1, num_points * (len(time_serie) - 1) + 1)
+
+    # Use the interpolation function to get the interpolated values
+    interpolated_values = f(new_times)
+
+    return interpolated_values
