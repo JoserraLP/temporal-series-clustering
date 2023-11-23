@@ -1,6 +1,5 @@
 import string
 
-from temporal_series_clustering.cluster.algorithms.dbscan import dbscan_cluster
 from temporal_series_clustering.cluster.algorithms.mean_cycle import mean_cycle_clustering
 from temporal_series_clustering.cluster.clustering import temporal_clustering
 from temporal_series_clustering.cluster.utils import store_clusters_json
@@ -48,19 +47,10 @@ def clusterize_real_predictors():
                                              algorithm=mean_cycle_clustering,
                                              epsilon=0.07)
 
-    clusters_data = process_clusters(clusters=mean_edge_clusters, predictions=predictors_output,
+    clusters_data = process_clusters(clusters=mean_edge_clusters,
                                      consistencies=filtration)
 
-    store_clusters_json(clusters_data, '../clusters/mean_edge.json')
-
-    # Try the clustering with DBSCAN
-    dbscan_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices, algorithm=dbscan_cluster,
-                                          epsilon=0.07)
-
-    clusters_data = process_clusters(clusters=dbscan_clusters, predictions=predictors_output,
-                                     consistencies=filtration)
-
-    store_clusters_json(clusters_data, '../clusters/dbscan.json')
+    store_clusters_json(clusters_data, '../clusters/mean_edge_with_historical.json')
 
 
 if __name__ == "__main__":
