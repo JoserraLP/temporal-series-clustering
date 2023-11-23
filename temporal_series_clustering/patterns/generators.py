@@ -68,6 +68,12 @@ def create_simulation_days(predictor, num_days):
     return [predictor(hour=hour) for hour in range(ITEMS_PER_DAY)] * num_days
 
 
+def create_simulation_specific_weekday(predictor, place_id, weekday):
+    simulation_normal_vol = [predictor(place_id=place_id, weekday=weekday, hour=hour, location="") for hour in
+                             range(ITEMS_PER_DAY)]
+    return simulation_normal_vol
+
+
 def create_simulation_weeks(predictor, place_id, num_weeks):
     simulation_normal_vol = []
     for _ in range(num_weeks):
@@ -95,7 +101,7 @@ def interpolate_time_serie(time_serie: list, num_points: int) -> list:
     :rtype: list
     """
 
-    # Create an array of times corresponding to your values
+    # Create an array of times corresponding to values
     times = np.arange(len(time_serie))
 
     # Create a cubic spline interpolation function
