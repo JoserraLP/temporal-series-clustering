@@ -38,7 +38,6 @@ def temporal_clustering(temporal_sheaf_models, temporal_consistency: dict, base_
         params = {'base_vertices': base_vertices, 'epsilon': epsilon,
                   'consistency': instant_consistency_value,
                   'historical_clusters': previous_clusters,
-                  'historical_info_used': historical_info_used,
                   'instant': instant
                   }
 

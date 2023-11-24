@@ -4,7 +4,7 @@ from temporal_series_clustering.cluster.algorithms.mean_cycle import mean_cycle_
 from temporal_series_clustering.cluster.clustering import temporal_clustering
 from temporal_series_clustering.cluster.utils import store_clusters_json
 from temporal_series_clustering.patterns.generators import create_simulation_weeks, predictor_city
-from temporal_series_clustering.sheaf.sheaf_model import create_sheaf_model, create_simplified_sheaf_model
+from temporal_series_clustering.sheaf.sheaf_model import create_sheaf_model, create_simplified_graph
 from temporal_series_clustering.sheaf.utils import propagate_sheaf_values
 from temporal_series_clustering.static.constants import NUM_WEEKS, ITEMS_PER_DAY
 from temporal_series_clustering.static.utils import process_clusters
@@ -40,7 +40,7 @@ def clusterize_real_predictors():
                                                                base_vertices=base_vertices)
 
     # Create instant sheaf simplified models
-    instant_sheaf_models = {instant: create_simplified_sheaf_model(num_vertices, filtration[instant]) for instant in
+    instant_sheaf_models = {instant: create_simplified_graph(num_vertices, filtration[instant]) for instant in
                             range(len(filtration))}
 
     mean_edge_clusters = temporal_clustering(instant_sheaf_models, filtration, base_vertices,

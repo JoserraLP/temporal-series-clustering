@@ -64,7 +64,7 @@ def create_sheaf_model(num_vertices: int):
     return sheaf
 
 
-def create_simplified_sheaf_model(num_vertices, instant_filtration):
+def create_simplified_graph(num_vertices, instant_filtration):
     """
     Create a simplified version of the sheaf model where the connections are only for base vertices.
 
