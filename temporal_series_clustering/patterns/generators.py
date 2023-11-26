@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 
 from temporal_series_clustering.static.constants import TEMPORAL_PATTERN_FILES, ITEMS_PER_DAY
@@ -37,31 +39,6 @@ def predictor_city(place_id: str, weekday: str, hour: int, location: str) -> int
     df_selection = df_selection.loc[df_selection['hour'] == hour]
 
     return df_selection[df_selection_column].values[0]
-
-
-def add_noise(arr, range_value, min_value, max_value, seed=1):
-    # Parse to numpy
-    if type(arr) == list:
-        arr = np.array(arr)
-    # Define your noise range
-    noise_range = (-range_value, range_value)
-
-    np.random.seed(seed)
-
-    # Generate random noise within the range
-    if range_value == 1:
-        # This is for congestion
-        noise = np.random.randint(noise_range[0], noise_range[1], arr.shape)
-    else:
-        noise = np.random.uniform(noise_range[0], noise_range[1], arr.shape)
-
-    # Add the noise to the array
-    arr = arr + noise
-
-    # Clip the array
-    arr = np.clip(arr, min_value, max_value)
-
-    return arr
 
 
 def create_simulation_days(predictor, num_days):
@@ -114,3 +91,74 @@ def interpolate_time_serie(time_serie: list, num_points: int) -> list:
     interpolated_values = f(new_times)
 
     return interpolated_values
+
+
+def add_noise(arr, range_value, min_value, max_value, seed=1):
+    # Parse to numpy
+    if type(arr) == list:
+        arr = np.array(arr)
+    # Define your noise range
+    noise_range = (-range_value, range_value)
+
+    np.random.seed(seed)
+
+    # Generate random noise within the range
+    if range_value == 1:
+        # This is for congestion
+        noise = np.random.randint(noise_range[0], noise_range[1], arr.shape)
+    else:
+        noise = np.random.uniform(noise_range[0], noise_range[1], arr.shape)
+
+    # Add the noise to the array
+    arr = arr + noise
+
+    # Clip the array
+    arr = np.clip(arr, min_value, max_value)
+
+    return arr
+
+
+def add_offset(arr, offset):
+    offset = offset % len(arr)  # Handle offsets greater than the length
+    return arr[-offset:] + arr[:-offset]
+
+
+def add_instant_variation(arr, noise_level=0.1, seed=1):
+    # Define the set
+    random.seed(seed)
+    # Limit the value between 0 and 1
+    return [min(max(x + random.uniform(-noise_level, noise_level), 0), 1) for x in arr]
+
+
+def combine_patterns(patterns, seed=1):
+    # Get the length of the patterns
+    length = len(patterns[0])
+
+    random.seed(seed)
+
+    # Check that all patterns are the same length
+    if not all(len(pattern) == length for pattern in patterns):
+        raise ValueError("All patterns must be the same length")
+
+    # Create a new pattern with the same length
+    new_pattern = []
+    for i in range(length):
+        # For each instant, choose a pattern randomly and take its value for that instant
+        pattern = random.choice(patterns)
+        new_pattern.append(pattern[i])
+
+    return new_pattern
+
+
+def smooth_edgy_values(pattern, threshold=0.40, smoothing_factor=0.40):
+    smoothed = [pattern[0]]  # Start with the first value
+    for i in range(1, len(pattern)):
+        diff = pattern[i] - pattern[i - 1]
+        if abs(diff) > threshold:
+            # If the difference is too large, smooth the value
+            smoothed_value = smoothed[-1] + diff * smoothing_factor
+            smoothed.append(smoothed_value)
+        else:
+            # If the difference is not too large, keep the original value
+            smoothed.append(pattern[i])
+    return smoothed
