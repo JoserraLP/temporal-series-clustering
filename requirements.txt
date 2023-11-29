@@ -8,3 +8,4 @@ tslearn~=0.6.2
 pandas~=2.1.0
 minisom~=2.3.1
 scipy~=1.11.1
+ordered_set
