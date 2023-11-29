@@ -12,22 +12,19 @@ def identity(a):
     return a
 
 
-def create_sheaf_model(num_vertices: int):
+def create_sheaf_model(input_vertices_labels: list):
     """
-    Create the sheaf model with the base number of vertices.
+    Create the sheaf model with the vertices.
 
     The model will have 2-higher level faces, the first one interconnecting all the vertices by pairs and
     the second one interconnecting all face-one level vertices on a single output vertex noted '@'.
 
     All the functions are identity.
 
-    :param num_vertices: number of base vertices
-    :type num_vertices: int
+    :param input_vertices_labels: input vertices labels
+    :type input_vertices_labels: list
     :return: sheaf model with the specified architecture
     """
-    # List of strings representing alphabet on uppercase
-    input_vertices_labels = list(string.ascii_uppercase)[:num_vertices]
-
     # Generate all possible relations (combinations of 2) between the strings
     face_one_relations = list(itertools.combinations(input_vertices_labels, 2))
 

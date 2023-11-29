@@ -150,7 +150,7 @@ def combine_patterns(patterns, seed=1):
     return new_pattern
 
 
-def smooth_edgy_values(pattern, threshold=0.40, smoothing_factor=0.40):
+def smooth_edgy_values(pattern, threshold=0.20, smoothing_factor=0.20):
     smoothed = [pattern[0]]  # Start with the first value
     for i in range(1, len(pattern)):
         diff = pattern[i] - pattern[i - 1]

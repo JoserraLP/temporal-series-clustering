@@ -1,7 +1,10 @@
+import time
+
 from ordered_set import OrderedSet
 
 from temporal_series_clustering.cluster.graph_utils import get_cycles_info_from_graph, get_clusters_from_cycles, \
     filter_edges_by_epsilon
+from temporal_series_clustering.cluster.utils import create_outliers_cluster, rename_clusters
 from temporal_series_clustering.storage.clusters_history import ClustersHistory
 from temporal_series_clustering.storage.consistencies import ConsistenciesHistory
 from temporal_series_clustering.storage.simplified_graphs import SimplifiedGraphsHistory
@@ -23,11 +26,13 @@ class TCBC:
 
     def perform_all_instants_clustering(self):
         historical_info_used = []
-
+        start_time = time.time()
         # Iterate over all the instants
         for instant, instant_consistencies in self._consistencies_history.info.items():
             self._perform_instant_clustering(instant=instant, instant_consistencies=instant_consistencies,
                                              historical_info_used=historical_info_used)
+
+        print(f"DFS lasted time {time.time() - start_time}")
 
         return OrderedSet(historical_info_used)
 
@@ -63,10 +68,17 @@ class TCBC:
                                                                                   instant_consistencies=
                                                                                   instant_consistencies,
                                                                                   previous_clusters_nodes=
-                                                                                  None)
+                                                                                  previous_clusters_nodes)
 
         # Add the instants on which the historical information has been used
         historical_info_used.extend(historical_info_instant_used)
+
+        # Create outliers cluster from individual nodes
+        instant_clusters = create_outliers_cluster(instant_clusters)
+
+        # Rename the clusters
+        instant_clusters = rename_clusters(instant_clusters)
+
 
         # STEP 4: CLUSTERS ADDITIONAL INFO
         # Firs it is required to create the clusters

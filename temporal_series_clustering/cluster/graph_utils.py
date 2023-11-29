@@ -230,7 +230,7 @@ def get_conflicting_clusters(cycles):
 
 def calculate_mean_consistency_from_node(node, possible_clusters, consistencies):
     mean_consistencies = []
-
+    # This allows to get the mean from a node to the rest nodes of each possible cluster
     for cluster in possible_clusters:
         mean_value = []
         for cluster_node in cluster:
@@ -246,8 +246,9 @@ def calculate_mean_consistency_from_node(node, possible_clusters, consistencies)
 def get_subset_conflicting_clusters(conflicting_clusters):
     # Check if the separate conflicting clusters have the same values, so it is possible to group them
     # Remove the key from each list in the dictionary
+    print(f"... Input clusters are: {conflicting_clusters}")
     clusters = {key: [item for item in value if item != key] for key, value in conflicting_clusters.items()}
-
+    print("...Getting subset of conflicting clusters...")
     # Find keys that have the same subset
     result = {}
     for key, value in clusters.items():
@@ -256,9 +257,11 @@ def get_subset_conflicting_clusters(conflicting_clusters):
             result[value] = []
         result[value].append(key)
 
+
     # Combine the keys and their corresponding lists
     combined_result = {keys[0]: sorted(list(value) + keys) for value, keys in result.items()}
 
+    print(f"Combined result is: {combined_result}")
     # If there is not combination, return the input
     if not combined_result:
         combined_result = conflicting_clusters
@@ -266,10 +269,10 @@ def get_subset_conflicting_clusters(conflicting_clusters):
     return combined_result
 
 
-def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
+def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
                              instant_consistencies: dict, previous_clusters_nodes: dict = None) -> dict:
     """
-    Get the clusters from the cycles of the graph
+    Get the clusters from the nodes of the graph
 
     :param base_vertices: list with base vertices
     :type base_vertices: list
@@ -291,20 +294,23 @@ def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: lis
 
     historical_info_used = []
 
+
     # Check if there are conflicting nodes
     if conflicting_clusters:
         print("-" * 10)
         print(f"INSTANT {instant}")
-        print(f"Conflicting nodes are: {conflicting_clusters.keys()}")
+        print(f"Conflicting nodes are: {list(conflicting_clusters.keys())}")
+        if previous_clusters_nodes:
+            print(f"Previous clusters are: {previous_clusters_nodes}")
         clusters = {}
         # Iterate over all conflicting clusters
         for conflicting_node, possible_conflicting_clusters in conflicting_clusters.items():
             check_distance = False
+            print(f"Conflicting node {conflicting_node} has clusters {possible_conflicting_clusters} ")
             # Check if the historical info has the conflicting node on the values (not keys)
             if previous_clusters_nodes and conflicting_node in \
                     [node for cluster in previous_clusters_nodes.values() for node in cluster]:
 
-                print(f"Conflicting node {conflicting_node} has clusters {possible_conflicting_clusters} ")
                 # Retrieve the cluster it belongs to
                 previous_cluster = [v for k, v in previous_clusters_nodes.items() if conflicting_node in v]
 
@@ -325,30 +331,36 @@ def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: lis
 
             if check_distance:
                 # Get all those remaining nodes that are conflicting as they will be checked afterwards
-                remaining_conflicting_nodes = [node for node in conflicting_clusters.keys() if node != conflicting_node]
+                # remaining_conflicting_nodes = [node for node in conflicting_clusters.keys() if node != conflicting_node]
+                #print(f"Remaining conflicting nodes for node {conflicting_node} are: {remaining_conflicting_nodes}")
                 # Remove them from the conflicting clusters
-                possible_conflicting_clusters = [[item for item in sublist if item not in remaining_conflicting_nodes]
-                                                 for sublist in possible_conflicting_clusters]
+                #possible_conflicting_clusters = [[item for item in sublist if item not in remaining_conflicting_nodes]
+                #                                for sublist in possible_conflicting_clusters]
+
+                print(f"Possible conflicting clusters are: {possible_conflicting_clusters}")
 
                 # Check to which cluster is closest, based on mean of consistency
                 mean_consistencies_node = calculate_mean_consistency_from_node(conflicting_node,
                                                                                possible_conflicting_clusters,
                                                                                consistencies=instant_consistencies)
 
+                print(f"Mean consistencies node {conflicting_node}: {mean_consistencies_node}")
+
                 # Get the index with lowest mean
                 argmin = np.argmin(mean_consistencies_node)
 
                 clusters[conflicting_node] = possible_conflicting_clusters[argmin]
+                print(f"Selected cluster for node {conflicting_node} is {clusters[conflicting_node]}")
 
         # Gather subsets into bigger sets
-        clusters = get_subset_conflicting_clusters(clusters)
+        # clusters = get_subset_conflicting_clusters(clusters)
 
-        print(f"Clusters based on conflicting nodes are: {clusters}")
+        # print(f"Clusters based on conflicting nodes are: {clusters}")
 
         # Remove those nodes that have been stored previously and do something similar as down
         remaining_nodes = set(base_vertices) - set([node for k, v in clusters.items() for node in v])
 
-        print(f"Remaining nodes are: {remaining_nodes}")
+        #print(f"Remaining nodes are: {remaining_nodes}")
 
         # Check if there is some cycle with the remaining nodes
         # Find the value and list where the nodes appear
@@ -356,12 +368,12 @@ def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: lis
 
         # If there are cycles store like there are
         for node, cycle in remaining_cycles.items():
-            print(f"Node {node}")
+            # print(f"Node {node}")
             if cycle:
-                print(f"Processing cycle {cycle}")
+                # print(f"Processing cycle {cycle}")
                 # Remove the conflicting nodes if exists
                 cycle = [item for item in cycle[0] if item not in list(conflicting_clusters.keys())]
-                print(f"Cycle - {cycle}")
+                # print(f"Cycle - {cycle}")
                 # Check if the cycle does not exist
                 if cycle not in list(clusters.values()):
                     # Store the cluster
@@ -371,6 +383,164 @@ def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: lis
                 clusters[node] = [node]
 
         print(f"Final clusters are: {clusters}")
+
+    else:
+        # First initialize the clusters that are alone, not in the graph (which is filtered)
+        clusters = {item: [item] for item in set(base_vertices) - set(graph_nodes)}
+
+        # Iterate over the cycles
+        for mean_cycle, cycle in cycles:
+            # First check if the cycle is superset of the clusters
+            # Parse cycle to a set
+            set_cycle = set(cycle)
+            # Define a key for superset if found
+            superset_key = ''
+            # Iterate over the clusters to check if the cycle is a superset
+            for key, cluster_nodes in clusters.items():
+                # If the cycle set is a superset of the cluster nodes
+                if set_cycle.issuperset(set(cluster_nodes)):
+                    # Set the superset_key and stop iterating
+                    superset_key = key
+                    break
+
+            if superset_key:
+                # If it is a superset of any cluster, replace the previous value with the new cluster
+                clusters[superset_key] = cycle
+            else:
+                # Otherwise, get the nodes that are not represented yet in the clusters
+
+                # Flatten the list of values in the dictionary
+                existing_clusters_nodes = [item for sublist in clusters.values() for item in sublist]
+
+                # Filter the input cycle, so we have those nodes that are not previously stored in clusters
+                non_existing_nodes_cycle = [node for node in cycle if node not in existing_clusters_nodes]
+
+                # If there exist a cycle
+                if non_existing_nodes_cycle:
+                    # Add the cycle to the clusters
+                    clusters[non_existing_nodes_cycle[0]] = non_existing_nodes_cycle
+
+    return clusters, historical_info_used
+
+
+# NEW APPROACH
+
+def sort_clusters_intra_mean(cycles, consistencies):
+
+    # Get consistencies of the each cycle
+    cluster_consistencies = []
+    for cycle in cycles:
+        cycle_consistencies = get_cycle_consistencies(cycle[1], consistencies)
+        cluster_consistencies.append(
+            sum(cycle_consistencies) / len(cycle_consistencies) if len(cycle_consistencies) > 0 else 0.00)
+
+    # Create a list of tuples where each tuple is (mean, cycle)
+    cycles_tuples = list(zip(cluster_consistencies, [cycle[1] for cycle in cycles]))
+
+    return sorted(cycles_tuples)
+
+
+def get_repeated_clusters(current_cycles: list, previous_clusters: dict):
+    repeated_clusters = []
+    for _, cycle in current_cycles:
+        if cycle in list(previous_clusters.values()):
+            repeated_clusters.append(cycle)
+
+    return repeated_clusters
+
+
+def filter_min_length_cycles(sorted_cycles_list: list):
+    result_cycle = [cycle for _, cycle in sorted_cycles_list if len(cycle) > 1]
+    result_cycle_idx = [cycle for _, cycle in sorted_cycles_list].index(result_cycle[0]) if len(result_cycle) > 0 \
+        else -1
+
+    return result_cycle[0] if len(result_cycle) > 0 else [], result_cycle_idx
+def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
+                             instant_consistencies: dict, previous_clusters_nodes: dict = None):
+    # Get conflicting clusters
+    conflicting_clusters = get_conflicting_clusters(cycles)
+
+    historical_info_used = []
+
+    clusters = {}
+
+    # Check if there are conflicting nodes
+    if conflicting_clusters:
+
+        # Add individual nodes to cycles with 0.00 consistency as they are consistent with themselves
+        if set(base_vertices) - set(graph_nodes):
+            cycles.append((0.00, [item for item in set(base_vertices) - set(graph_nodes)]))
+
+        # Create a list those nodes that have been checked
+        nodes_checked = []
+        # Create a list for storing the final clusters
+        clusters_list = []
+
+        # Check historical information
+        if previous_clusters_nodes:
+            # Compare all current clusters to previous and get those that are equal
+            repeated_clusters = get_repeated_clusters(cycles, previous_clusters_nodes)
+
+            # Append to clusters list
+            clusters_list = repeated_clusters
+            # Append to nodes checked
+            nodes_checked = [item for cluster in repeated_clusters for item in cluster]
+
+            # Remove those repeated clusters from the cycles
+            cycles = [(mean, cycle) for mean, cycle in cycles if cycle not in repeated_clusters]
+
+            # Calculate and sort the new cycles without the checked nodes
+            for j in range(len(cycles)):
+                # Remove checked values
+                cycles[j] = [node for node in cycles[j][1] if node not in nodes_checked]
+
+                # Calculate new intra-means
+                cycles[j] = (get_cycle_consistencies(cycles[j], instant_consistencies),
+                             cycles[j])
+
+            # Insert instant for historical info
+            if clusters_list:
+                historical_info_used.append(instant)
+
+        # Sort the cluster by its average intra_mean
+        sorted_cycles_tuples = sort_clusters_intra_mean(cycles, instant_consistencies)
+
+        # Iterate until all nodes have been checked or there are no more cycles
+        while nodes_checked != graph_nodes and sorted_cycles_tuples:
+            # Use current information
+            # Get the cycle that is greater than single item
+            cycle, cycle_idx = filter_min_length_cycles(sorted_cycles_tuples)
+
+            # Get the minimum if not found
+            if not cycle:
+                # Get those nodes from cycle that have not been checked previously
+                cycle = [node for node in sorted_cycles_tuples[0][1] if node not in nodes_checked]
+
+                # Remove the item from sorted_cycles_tuples
+                sorted_cycles_tuples.pop(0)
+            else:
+                sorted_cycles_tuples.pop(cycle_idx)
+
+            # Store nodes checked
+            nodes_checked += cycle
+            # Add cycle to clusters
+            clusters_list.append(cycle)
+
+            # Calculate and sort the new cycles without the checked nodes
+            for j in range(len(sorted_cycles_tuples)):
+                # Remove checked values
+                removed_nodes_cycle = [node for node in sorted_cycles_tuples[j][1] if node not in nodes_checked]
+
+                if removed_nodes_cycle:
+                    # Calculate new intra-means
+                    sorted_cycles_tuples[j] = (get_cycle_consistencies(removed_nodes_cycle, instant_consistencies),
+                                               removed_nodes_cycle)
+
+
+        # Store clusters as dict
+        for cluster in clusters_list:
+            if cluster:
+                clusters[cluster[0]] = cluster
 
     else:
         # First initialize the clusters that are alone, not in the graph (which is filtered)

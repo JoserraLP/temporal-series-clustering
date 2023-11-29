@@ -56,3 +56,34 @@ def find_key_of_item(item, dictionary):
         if any(item in sublist for sublist in value):
             return key
     return None
+
+
+def create_outliers_cluster(clusters):
+    """
+    Gather those individual clusters into a cluster called 'outliers'
+
+    :param clusters:
+    :return:
+    """
+    resulting_cluster = {'outliers': []}
+    for key, cluster in clusters.items():
+        if len(cluster) == 1:
+            # Individual element, store in the outliers
+            resulting_cluster['outliers'].append(cluster[0])
+        else:
+            # Otherwise remain the same
+            resulting_cluster[key] = cluster
+
+    return resulting_cluster
+
+
+def rename_clusters(clusters):
+    renamed_clusters = {}
+    for i, (k, v) in enumerate(clusters.items()):
+        # Do not rename the outliers cluster
+        if k != 'outliers':
+            renamed_clusters[f'cluster_{i}'] = v
+        else:
+            renamed_clusters[k] = v
+
+    return renamed_clusters
