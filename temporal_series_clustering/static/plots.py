@@ -3,6 +3,8 @@ from matplotlib import pyplot as plt
 
 from temporal_series_clustering.storage.epsilons import EpsilonValues
 
+results_dir = "../results/plots/"
+
 
 def show_instant_epsilons(epsilon_values: EpsilonValues):
     epsilon_instant_means = {k: [value['intra_mean'] for instant, value in v["instant"].items()]
@@ -134,7 +136,7 @@ def show_mean_num_clusters_epsilons(epsilon_values: EpsilonValues):
 
 
 ### From here on are the plots defined by Victor and Me
-def show_avg_all_instants_metric_against_epsilon(metric, epsilon_values: EpsilonValues):
+def show_avg_all_instants_metric_against_epsilon(metric, epsilon_values: EpsilonValues, show_plots: bool = False):
     data = {k: v[metric] for k, v in epsilon_values.info.items()}
 
     for i, (key, value) in enumerate(data.items()):
@@ -142,10 +144,16 @@ def show_avg_all_instants_metric_against_epsilon(metric, epsilon_values: Epsilon
         plt.annotate(key, (i, value), xytext=(-10, 10), textcoords='offset points')
 
     plt.legend()
-    plt.show()
+    plt.title(f"Average all instants against epsilon for metric {metric}")
+    plt.savefig(results_dir + f"avg_all_instants_{metric}_against_epsilon.png")
+
+    if show_plots:
+        plt.show()
+    else:
+        plt.clf()
 
 
-def show_metric_against_time(metric, epsilon_values: EpsilonValues):
+def show_metric_against_time(metric, epsilon_values: EpsilonValues, show_plots: bool = False):
     metric_data = {k: [value[metric] for instant, value in v["instant"].items()]
                    for k, v in epsilon_values.info.items()}
 
@@ -166,7 +174,7 @@ def show_metric_against_time(metric, epsilon_values: EpsilonValues):
 
         ax1.plot(x, values_metric_data[i], color=color, label=epsilon, linestyle='-')
 
-    ax1.set_xlabel('epsilon')
+    ax1.set_xlabel('time')
     ax1.set_ylabel(metric)
 
     ax2 = ax1.twinx()
@@ -183,10 +191,54 @@ def show_metric_against_time(metric, epsilon_values: EpsilonValues):
     plt.figtext(0.5, 0.01, f"Straight lines:{metric};\nDashed lines:num_clusters",
                 ha="center", fontsize=10)
     plt.legend()
-    plt.show()
+    plt.title(f"{metric} against time compared to number of clusters")
+    plt.savefig(results_dir + f"{metric}_and_num_clusters_against_time.png")
+
+    if show_plots:
+        plt.show()
+    else:
+        plt.clf()
 
 
-def show_avg_num_clusters_against_epsilon(epsilon_values: EpsilonValues):
+def show_metric_against_time_by_epsilon(metric, epsilon, epsilon_values: EpsilonValues, show_plots: bool = False):
+    metric_data = {k: [value[metric] for instant, value in v["instant"].items()]
+                   for k, v in epsilon_values.info.items() if k == epsilon}
+
+    num_clusters = {k: [len(list(v['instant'][instant]['value'].keys())) for instant, value in v["instant"].items()]
+                    for k, v in epsilon_values.info.items() if k == epsilon}
+    x = list(range(len(list(metric_data.values())[0])))
+    values_num_clusters = list(num_clusters.values())
+    values_metric_data = list(metric_data.values())
+
+    fig, ax1 = plt.subplots()
+
+    color = 'tab:red'
+    ax1.plot(x, values_metric_data[0], color=color, label=epsilon, linestyle='-')
+    ax1.tick_params(axis='y', labelcolor=color)
+    ax1.set_xlabel('time')
+    ax1.set_ylabel(metric, color=color)
+
+    ax2 = ax1.twinx()
+
+    color = 'tab:blue'
+    ax2.plot(x, values_num_clusters[0], color=color, label=epsilon, linestyle='--')
+    ax2.tick_params(axis='y', labelcolor=color)
+    ax2.set_ylabel('num_clusters', color=color)  # we already handled the x-label with ax1
+
+    # Add text below the plot
+    plt.figtext(0.5, 0.01, f"Straight lines:{metric};\nDashed lines:num_clusters",
+                ha="center", fontsize=10)
+    plt.legend()
+    plt.title(f"{metric} against time compared to number of clusters for epsilon {epsilon}")
+    plt.savefig(results_dir + f"{metric}_and_num_clusters_for_epsilon_{epsilon}_against_time.png")
+
+    if show_plots:
+        plt.show()
+    else:
+        plt.clf()
+
+
+def show_avg_num_clusters_against_epsilon(epsilon_values: EpsilonValues, show_plots: bool = False):
     data = {k: len(list(v['instant'][instant]['value'].keys())) for k, v in epsilon_values.info.items()
             for instant, value in v["instant"].items()}
 
@@ -195,10 +247,16 @@ def show_avg_num_clusters_against_epsilon(epsilon_values: EpsilonValues):
         plt.annotate(key, (i, value), xytext=(-10, 10), textcoords='offset points')
 
     plt.legend()
-    plt.show()
+    plt.title(f"Average number of clusters against epsilon")
+    plt.savefig(results_dir + f"avg_num_clusters_against_epsilon.png")
+
+    if show_plots:
+        plt.show()
+    else:
+        plt.clf()
 
 
-def show_num_clusters_against_time(epsilon_values: EpsilonValues):
+def show_num_clusters_against_time(epsilon_values: EpsilonValues, show_plots: bool = False):
     data = {k: [len(list(v['instant'][instant]['value'].keys())) for instant, value in v["instant"].items()]
             for k, v in epsilon_values.info.items()}
 
@@ -206,16 +264,29 @@ def show_num_clusters_against_time(epsilon_values: EpsilonValues):
         plt.plot(values, label=key)
 
     plt.legend()
-    plt.show()
+    plt.title(f"Number of clusters per epsilon against time")
+    plt.savefig(results_dir + f"num_clusters_per_epsilon_against_time.png")
+
+    if show_plots:
+        plt.show()
+    else:
+        plt.clf()
 
 
-def show_metric_against_time_by_epsilon(epsilon: float, epsilon_values: EpsilonValues):
-    data = {k: len(list(v['instant'][instant]['value'].keys())) for k, v in epsilon_values.info.items()
-            for instant, value in v["instant"].items() if k == epsilon}
+def show_global_metric_against_time_by_epsilon(metric: str, epsilon: float, epsilon_values: EpsilonValues,
+                                               show_plots: bool = False):
+    data = {k: v[metric] for k, v in epsilon_values.info.items() if k == epsilon}
 
     if data:
-        for key, values in data.items():
-            plt.plot(values, label=key)
+        for i, (key, value) in enumerate(data.items()):
+            plt.plot(i, value, 'o', label=key)
+            plt.annotate(key, (i, value), xytext=(-10, 10), textcoords='offset points')
 
-        plt.legend()
-        plt.show()
+            plt.legend()
+            plt.title(f"Global {metric} for epsilon {epsilon} against time")
+            plt.savefig(results_dir + f"global_{metric}_for_epsilon_{epsilon}_against_time.png")
+
+            if show_plots:
+                plt.show()
+            else:
+                plt.clf()
