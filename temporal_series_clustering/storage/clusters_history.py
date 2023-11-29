@@ -1,5 +1,8 @@
 import copy
 
+import numpy as np
+from sklearn.metrics import silhouette_score
+
 from temporal_series_clustering.cluster.graph_utils import get_cycle_consistencies
 
 
@@ -85,7 +88,7 @@ class ClustersHistory:
                 nodes_same_cluster = []
 
                 # Retrieve the cluster it belongs to
-                for k, cluster in  self._info[instant]['value'].items():
+                for k, cluster in self._info[instant]['value'].items():
                     # Cluster items are the 'nodes' key
                     cluster = cluster['nodes']
                     if node in cluster:
@@ -112,7 +115,6 @@ class ClustersHistory:
                         # Append the connection as it has been checked
                         connections_checked.append(key2)
 
-
             # Calculate the overall inter mean of a given instant
             self._info[instant]['inter_mean'] = sum(inter_consistencies_values) / len(inter_consistencies_values) \
                 if len(inter_consistencies_values) > 0 else 0.0
@@ -121,9 +123,36 @@ class ClustersHistory:
             self._info[instant]['min_inter_mean'] = min(inter_consistencies_values) \
                 if len(inter_consistencies_values) > 0 else 0.0
 
+    def calculate_instant_silhouette(self, instant, instant_consistencies: dict):
+        # Calculate the silhouette score
+        nodes = sorted(set([node for k, nodes_cluster in self._info[instant]['value'].items()
+                            for node in nodes_cluster['nodes']]))
 
-    def calculate_average_metrics(self):
-        pass
+        # Create a distance matrix
+        distance_matrix = np.zeros((len(nodes), len(nodes)))
+        for i, node_i in enumerate(nodes):
+            for j, node_j in enumerate(nodes):
+                if i != j:
+                    key = '_'.join(sorted([node_i, node_j]))
+                    distance_matrix[i, j] = instant_consistencies[key]
+
+        # Retrieve the clusters
+        clusters = [nodes_cluster['nodes'] for k, nodes_cluster in self._info[instant]['value'].items()
+                    if nodes_cluster['nodes']]
+
+        # Create labels for each node based on clusters
+        labels = np.zeros(len(nodes), dtype=int)
+
+        for i, cluster in enumerate(clusters):
+            for node in cluster:
+                labels[nodes.index(node)] = i
+
+        # Only calculate the silhouette when there is more than one cluster
+        silhouette_score_val = silhouette_score(distance_matrix, labels, metric='precomputed') if len(
+            clusters) > 1 else -1.0
+
+        # Calculate silhouette score
+        self._info[instant]['silhouette_score'] = silhouette_score_val
 
     def get_all_info_on_instant(self, instant: int):
         instant_info = None

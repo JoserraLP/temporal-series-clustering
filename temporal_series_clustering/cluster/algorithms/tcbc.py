@@ -79,7 +79,6 @@ class TCBC:
         # Rename the clusters
         instant_clusters = rename_clusters(instant_clusters)
 
-
         # STEP 4: CLUSTERS ADDITIONAL INFO
         # Firs it is required to create the clusters
         self._clusters_history.insert_cluster_metrics(instant=instant, clusters=instant_clusters,
@@ -91,6 +90,9 @@ class TCBC:
         # Calculate the inter cluster mean (average and min) with the simplified (not filtered) graph
         self._clusters_history.calculate_instant_inter_mean(instant, all_nodes=simplified_graph.nodes,
                                                             instant_consistencies=instant_consistencies)
+
+        # Calculate the silhouette score
+        self._clusters_history.calculate_instant_silhouette(instant, instant_consistencies=instant_consistencies)
 
     @property
     def clusters_history(self):
