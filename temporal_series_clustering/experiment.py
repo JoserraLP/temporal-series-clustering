@@ -114,11 +114,11 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
         total_times[epsilon] = time.time() - start_time
         print(f"On epsilon {epsilon}, lasted time {time.time() - start_time}")
 
-    # Store epsilon file
-    store_clusters_json(epsilon_values.info, f'../results/experiment_50_clusters.json')
+        # Store epsilon file
+        store_clusters_json(epsilon_values.info, f'../results/experiment_50_clusters.json')
 
-    with open('../results/experiment_50_clusters_times.json', 'w') as f:
-        json.dump(total_times, f)
+        with open('../results/experiment_50_clusters_times.json', 'w') as f:
+            json.dump(total_times, f)
 
     return epsilon_values
 
