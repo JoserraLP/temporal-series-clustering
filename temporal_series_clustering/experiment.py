@@ -82,7 +82,7 @@ def generate_patterns(total_num=50):
 
     predictors_output.extend(pattern_combinations)
 
-    return predictors_output
+    return predictors_output[:total_num]
 
 
 def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, base_vertices):
