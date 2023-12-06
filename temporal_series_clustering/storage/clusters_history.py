@@ -133,8 +133,12 @@ class ClustersHistory:
         for i, node_i in enumerate(nodes):
             for j, node_j in enumerate(nodes):
                 if i != j:
-                    key = '_'.join(sorted([node_i, node_j]))
-                    distance_matrix[i, j] = instant_consistencies[key]
+                    key = '_'.join([node_i, node_j])
+                    # Alternative if it does not exist the key
+                    if key in instant_consistencies:
+                        distance_matrix[i, j] = instant_consistencies[key]
+                    else:
+                        distance_matrix[i, j] = instant_consistencies['_'.join([node_j, node_i])]
 
         # Retrieve the clusters
         clusters = [nodes_cluster['nodes'] for k, nodes_cluster in self._info[instant]['value'].items()
