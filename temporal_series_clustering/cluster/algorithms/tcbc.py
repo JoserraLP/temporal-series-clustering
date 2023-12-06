@@ -29,10 +29,9 @@ class TCBC:
         start_time = time.time()
         # Iterate over all the instants
         for instant, instant_consistencies in self._consistencies_history.info.items():
+
             self._perform_instant_clustering(instant=instant, instant_consistencies=instant_consistencies,
                                              historical_info_used=historical_info_used)
-
-        print(f"DFS lasted time {time.time() - start_time}")
 
         return OrderedSet(historical_info_used)
 

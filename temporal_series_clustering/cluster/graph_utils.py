@@ -4,6 +4,12 @@ import numpy as np
 from temporal_series_clustering.cluster.utils import find_key_of_item
 
 
+def get_cliques_by_graph(graph: nx.MultiDiGraph):
+    # Bron–Kerbosch algorithm
+    # Find all cliques from the undirected graph
+    return list(nx.find_cliques(graph.to_undirected()))
+
+
 def get_cycle_consistencies(cycle: list, consistencies: dict) -> list:
     """
     Get the consistencies values for each item of the cycle
@@ -170,8 +176,8 @@ def get_cycles_info_from_graph(G: nx.MultiDiGraph, instant_consistencies: dict) 
     :type instant_consistencies: dict
     :return: mean-based sorted graph cycles list
     """
-    # Get all the possible cycles on the graph
-    cycles = get_valid_cycles(G)
+    # Get all the possible cliques on the graph
+    cycles = get_cliques_by_graph(G)
 
     # Calculate the mean value of the cycle consistency
     mean_consistency_cycles = []
@@ -257,7 +263,6 @@ def get_subset_conflicting_clusters(conflicting_clusters):
             result[value] = []
         result[value].append(key)
 
-
     # Combine the keys and their corresponding lists
     combined_result = {keys[0]: sorted(list(value) + keys) for value, keys in result.items()}
 
@@ -270,7 +275,7 @@ def get_subset_conflicting_clusters(conflicting_clusters):
 
 
 def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
-                             instant_consistencies: dict, previous_clusters_nodes: dict = None) -> dict:
+                            instant_consistencies: dict, previous_clusters_nodes: dict = None) -> dict:
     """
     Get the clusters from the nodes of the graph
 
@@ -293,7 +298,6 @@ def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list
     conflicting_clusters = get_conflicting_clusters(cycles)
 
     historical_info_used = []
-
 
     # Check if there are conflicting nodes
     if conflicting_clusters:
@@ -332,9 +336,9 @@ def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list
             if check_distance:
                 # Get all those remaining nodes that are conflicting as they will be checked afterwards
                 # remaining_conflicting_nodes = [node for node in conflicting_clusters.keys() if node != conflicting_node]
-                #print(f"Remaining conflicting nodes for node {conflicting_node} are: {remaining_conflicting_nodes}")
+                # print(f"Remaining conflicting nodes for node {conflicting_node} are: {remaining_conflicting_nodes}")
                 # Remove them from the conflicting clusters
-                #possible_conflicting_clusters = [[item for item in sublist if item not in remaining_conflicting_nodes]
+                # possible_conflicting_clusters = [[item for item in sublist if item not in remaining_conflicting_nodes]
                 #                                for sublist in possible_conflicting_clusters]
 
                 print(f"Possible conflicting clusters are: {possible_conflicting_clusters}")
@@ -360,7 +364,7 @@ def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list
         # Remove those nodes that have been stored previously and do something similar as down
         remaining_nodes = set(base_vertices) - set([node for k, v in clusters.items() for node in v])
 
-        #print(f"Remaining nodes are: {remaining_nodes}")
+        # print(f"Remaining nodes are: {remaining_nodes}")
 
         # Check if there is some cycle with the remaining nodes
         # Find the value and list where the nodes appear
@@ -426,7 +430,6 @@ def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list
 # NEW APPROACH
 
 def sort_clusters_intra_mean(cycles, consistencies):
-
     # Get consistencies of the each cycle
     cluster_consistencies = []
     for cycle in cycles:
@@ -455,6 +458,8 @@ def filter_min_length_cycles(sorted_cycles_list: list):
         else -1
 
     return result_cycle[0] if len(result_cycle) > 0 else [], result_cycle_idx
+
+
 def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
                              instant_consistencies: dict, previous_clusters_nodes: dict = None):
     # Get conflicting clusters
@@ -535,7 +540,6 @@ def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: lis
                     # Calculate new intra-means
                     sorted_cycles_tuples[j] = (get_cycle_consistencies(removed_nodes_cycle, instant_consistencies),
                                                removed_nodes_cycle)
-
 
         # Store clusters as dict
         for cluster in clusters_list:
