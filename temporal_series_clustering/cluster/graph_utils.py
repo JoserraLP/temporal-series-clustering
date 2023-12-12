@@ -516,30 +516,39 @@ def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cycles: lis
             # Get the cycle that is greater than single item
             cycle, cycle_idx = filter_min_length_cycles(sorted_cycles_tuples)
 
-            # Get the minimum if not found
+            # Get the minimum if not found, meaning get the first one
             if not cycle:
                 # Get those nodes from cycle that have not been checked previously
                 cycle = [node for node in sorted_cycles_tuples[0][1] if node not in nodes_checked]
 
-                # Remove the item from sorted_cycles_tuples
                 sorted_cycles_tuples.pop(0)
+
             else:
+                # Pop removed cycle
                 sorted_cycles_tuples.pop(cycle_idx)
 
-            # Store nodes checked
-            nodes_checked += cycle
-            # Add cycle to clusters
-            clusters_list.append(cycle)
+            # Check if not stored previously
+            if cycle and not set(cycle).issubset(nodes_checked):
 
-            # Calculate and sort the new cycles without the checked nodes
-            for j in range(len(sorted_cycles_tuples)):
-                # Remove checked values
-                removed_nodes_cycle = [node for node in sorted_cycles_tuples[j][1] if node not in nodes_checked]
+                # Store nodes checked
+                nodes_checked += cycle
+                # Add cycle to clusters
+                clusters_list.append(cycle)
 
-                if removed_nodes_cycle:
-                    # Calculate new intra-means
-                    sorted_cycles_tuples[j] = (get_cycle_consistencies(removed_nodes_cycle, instant_consistencies),
-                                               removed_nodes_cycle)
+                # Calculate and sort the new cycles without the checked nodes
+                for j in range(len(sorted_cycles_tuples)):
+                    # Remove checked values
+                    removed_nodes_cycle = [node for node in sorted_cycles_tuples[j][1] if node not in nodes_checked]
+
+                    if removed_nodes_cycle:
+                        cycle_consistencies = get_cycle_consistencies(removed_nodes_cycle, instant_consistencies)
+                        mean_consistencies = np.mean(cycle_consistencies) if cycle_consistencies else 0.0
+                        # Calculate new intra-means
+                        sorted_cycles_tuples[j] = (mean_consistencies if not np.isnan(mean_consistencies) else 0.0,
+                                                   removed_nodes_cycle)
+
+                # Sort again
+                sorted_cycles_tuples = sorted(sorted_cycles_tuples, key=lambda x:x[0])
 
         # Store clusters as dict
         for cluster in clusters_list:

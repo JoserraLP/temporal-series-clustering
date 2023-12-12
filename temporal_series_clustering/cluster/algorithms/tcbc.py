@@ -17,12 +17,14 @@ class TCBC:
     """
 
     def __init__(self, clusters_history: ClustersHistory, consistencies_history: ConsistenciesHistory,
-                 simplified_graphs_history: SimplifiedGraphsHistory, base_vertices: list, epsilon: float):
+                 simplified_graphs_history: SimplifiedGraphsHistory, base_vertices: list, epsilon: float,
+                 use_historical: list):
         self._clusters_history = clusters_history
         self._consistencies_history = consistencies_history
         self._simplified_graphs_history = simplified_graphs_history
         self._base_vertices = base_vertices
         self._epsilon = epsilon
+        self._use_historical = use_historical
 
     def perform_all_instants_clustering(self):
         historical_info_used = []
@@ -59,6 +61,10 @@ class TCBC:
         sorted_cycles = get_cycles_info_from_graph(filtered_G, instant_consistencies)
 
         # STEP 3: CLUSTERS
+        # If instant is not enabled for historical use
+        if instant not in self._use_historical:
+            previous_clusters_nodes = None
+
         # Get all the clusters from the cycles and if the historical information has been used
         instant_clusters, historical_info_instant_used = get_clusters_from_cycles(base_vertices=self._base_vertices,
                                                                                   cycles=sorted_cycles,

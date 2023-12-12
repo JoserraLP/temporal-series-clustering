@@ -17,14 +17,14 @@ from temporal_series_clustering.storage.epsilons import EpsilonValues
 from temporal_series_clustering.storage.simplified_graphs import SimplifiedGraphsHistory
 
 
-def generate_patterns(total_num=50):
+def generate_patterns(weekday: str, total_num=50):
     # Get the simulations of each predictor
-    a_simulation = create_simulation_specific_weekday(predictor_city, place_id='a', weekday="weekday")
-    b_simulation = create_simulation_specific_weekday(predictor_city, place_id='b', weekday="weekday")
-    c_simulation = create_simulation_specific_weekday(predictor_city, place_id='c', weekday="weekday")
-    d_simulation = create_simulation_specific_weekday(predictor_city, place_id='d', weekday="weekday")
-    e_simulation = create_simulation_specific_weekday(predictor_city, place_id='e', weekday="weekday")
-    f_simulation = create_simulation_specific_weekday(predictor_city, place_id='f', weekday="weekday")
+    a_simulation = create_simulation_specific_weekday(predictor_city, place_id='a', weekday=weekday)
+    b_simulation = create_simulation_specific_weekday(predictor_city, place_id='b', weekday=weekday)
+    c_simulation = create_simulation_specific_weekday(predictor_city, place_id='c', weekday=weekday)
+    d_simulation = create_simulation_specific_weekday(predictor_city, place_id='d', weekday=weekday)
+    e_simulation = create_simulation_specific_weekday(predictor_city, place_id='e', weekday=weekday)
+    f_simulation = create_simulation_specific_weekday(predictor_city, place_id='f', weekday=weekday)
 
     predictors_output = [a_simulation, b_simulation, c_simulation, d_simulation, e_simulation, f_simulation]
 
@@ -85,7 +85,7 @@ def generate_patterns(total_num=50):
     return predictors_output[:total_num]
 
 
-def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, base_vertices):
+def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, base_vertices, use_historical: bool):
     # Define epsilon values object
     epsilon_values = EpsilonValues()
 
@@ -96,15 +96,18 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
 
     total_times = {}
 
-    # Perform clustering per each possible epsilon (represented as int)
-    for epsilon in np.arange(0.05, 0.20, 0.05):
+    # Append use historical sufix on files
+    sufix = "no_" if not use_historical else ""
 
+    # Perform clustering per each possible epsilon
+    for epsilon in np.arange(0.00, 0.30, 0.01):
         start_time = time.time()
         tcbc = TCBC(consistencies_history=consistencies_history,
                     clusters_history=ClustersHistory(),
                     simplified_graphs_history=simplified_graphs,
                     base_vertices=base_vertices,
-                    epsilon=epsilon)
+                    epsilon=epsilon,
+                    use_historical=use_historical)
 
         historical_info_used = tcbc.perform_all_instants_clustering()
 
@@ -115,9 +118,10 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
         print(f"On epsilon {epsilon}, lasted time {time.time() - start_time}")
 
         # Store epsilon file
-        store_clusters_json(epsilon_values.info, f'../results/experiment_50_clusters.json')
+        store_clusters_json(epsilon_values.info,
+                            f'../results/experiment_{len(base_vertices)}_sources_{sufix}historical.json')
 
-        with open('../results/experiment_50_clusters_times.json', 'w') as f:
+        with open(f'../results/experiment_{len(base_vertices)}_sources_times_{sufix}historical.json', 'w') as f:
             json.dump(total_times, f)
 
     return epsilon_values
@@ -142,9 +146,25 @@ def generate_characters(n):
 
 if __name__ == "__main__":
     # Define number of patterns
-    num_patterns = 50
-    # Generate patterns
-    patterns = generate_patterns(num_patterns)
+    num_patterns = 64
+    # Generate patterns for each possible weekday
+    weekday_patterns = generate_patterns(weekday="weekday", total_num=num_patterns)
+    saturday_patterns = generate_patterns(weekday="saturday", total_num=num_patterns)
+    sunday_patterns = generate_patterns(weekday="sunday", total_num=num_patterns)
+
+    # Define patterns to concat all the weekday patterns
+    patterns = []
+    # Iterate over each pattern (same length)
+    for i in range(len(weekday_patterns)):
+        # Concat the three patterns
+        pattern_concat = weekday_patterns[i] + saturday_patterns[i] + sunday_patterns[i]
+        # Append to list of patterns
+        patterns.append(pattern_concat)
+
+    # Define a list indicating the instants on which use historical. Empty for no use
+    use_historical = []
+    # All instants
+    # use_historical = [i for i in range(len(patterns[0]))]
 
     # Get base vertices
     base_vertices = generate_characters(num_patterns)
@@ -164,4 +184,5 @@ if __name__ == "__main__":
     consistencies_history = ConsistenciesHistory(filtration)
 
     epsilon_values = perform_epsilon_optimization(base_vertices=base_vertices,
-                                                  consistencies_history=consistencies_history)
+                                                  consistencies_history=consistencies_history,
+                                                  use_historical=use_historical)
