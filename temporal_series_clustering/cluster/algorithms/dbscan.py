@@ -1,125 +1,100 @@
-import networkx as nx
 import numpy as np
 from sklearn.cluster import DBSCAN
+from sklearn.metrics import silhouette_score
 
-from temporal_series_clustering.cluster.algorithms.mean_cycle import get_cycle_consistencies
-
-
-def dbscan_cluster_graph(G, **kwargs):
-    # Get the adjacency matrix (A) from the graph
-    A = nx.adjacency_matrix(G, weight='consistency')
-
-    epsilon = kwargs['epsilon']
-    consistency_dict = kwargs['consistency']
-
-    # Apply DBSCAN on the adjacency matrix.
-    # Note: In this example, we're using the weights from the graph as our data points for DBSCAN.
-    # You might want to adjust the parameters (eps and min_samples) based on your specific use case.
-    db = DBSCAN(eps=epsilon, min_samples=1).fit(A)
-
-    # Get the labels (clusters) from the DBSCAN output
-    labels = db.labels_
-
-    # Create a dictionary that maps each node to a cluster
-    node_to_cluster = {node: cluster for node, cluster in zip(G.nodes, labels)}
-
-    # Create an empty dictionary for the clusters
-    clusters = {}
-
-    # Iterate over the items in the original dictionary
-    for key, value in node_to_cluster.items():
-        # If the value is not already a key in the clusters, add it with an empty list as its value
-        if value not in clusters:
-            clusters[value] = []
-        # Append the original key to the list of values for this key in the clusters
-        clusters[value].append(key)
-
-    # Now, if you want the keys to be the first element of each list, you can do this:
-    clusters = {v[0]: v for k, v in clusters.items()}
-
-    # Define the clusters info dict
-    clusters_info = {'value': {}, 'mean': None}
-
-    # Iterate over the clusters to get the mean consistency for a given instant
-    for k, cluster in clusters.items():
-        # Get consistencies of the cluster
-        cluster_consistencies = get_cycle_consistencies(cluster, consistency_dict)
-        # Calculate the mean value of the consistency. If not valid set infinite as we search the minimum
-        mean_consistency_cluster = sum(cluster_consistencies) / len(cluster_consistencies) if cluster_consistencies \
-            else None
-        # Append data
-        clusters_info['value'][k] = {
-            'nodes': cluster,
-            'mean': mean_consistency_cluster
-        }
-
-    # Retrieve the mean values for each clusters
-    mean_clusters_values = [v['mean'] for k, v in clusters_info['value'].items() if v['mean']]
-
-    # Calculate the overall mean of a given instant
-    clusters_info['mean'] = sum(mean_clusters_values) / len(mean_clusters_values) if len(mean_clusters_values) > 0 \
-        else None
-
-    return clusters_info
+from temporal_series_clustering.storage.clusters_history import ClustersHistory
 
 
-def dbscan_cluster(epsilon, input_time_series, base_vertices):
-    # input_time_series is a list of lists
-    # Iterate over the series items (instants)
+class DBscanClustering:
+    """
+    Class representing DBscan clustering algorithm
+    """
+    def __init__(self, clusters_history: ClustersHistory, input_time_series: list, base_vertices: list, epsilon: float):
+        self._clusters_history = clusters_history
+        self._input_time_series = input_time_series
+        self._base_vertices = base_vertices
+        self._epsilon = epsilon
+        # Create a DBScan instance with the min number of samples
+        self._dbscan = DBSCAN(eps=epsilon, min_samples=1)
 
-    dbscan_clusters = {"instant": {}, "mean": None}
+    def perform_all_instants_clustering(self):
+        # Iterate over all the instants, indicated by the first time series, there are all the same
+        for instant in range(len(self._input_time_series[0])):
+            self._perform_instant_clustering(instant=instant)
 
-    # Initialize dbscan algorithm
-    db = DBSCAN(eps=epsilon, min_samples=1)
-
-    for instant in range(len(input_time_series[0])):
-        values = [time_serie[instant] for time_serie in input_time_series]
+    def _perform_instant_clustering(self, instant):
+        # STEP 1: Get the values and process it
+        # Get the values
+        instant_values = [time_serie[instant] for time_serie in self._input_time_series]
 
         # Convert to a 2D array
-        values = np.array(values).reshape(-1, 1)
+        instant_values = np.array(instant_values).reshape(-1, 1)
 
         # Apply DBSCAN on the input value
-        db.fit(values)
+        self._dbscan.fit(instant_values)
 
         # Get the labels (clusters) from the DBSCAN output
-        labels = db.labels_
+        assignments = self._dbscan.labels_
 
-        # Create an empty dictionary for the clusters
+        # STEP 3: Create clusters
+        # Create a dictionary to store the clusters
         clusters = {}
-
         # Assign each base vertex to its corresponding cluster
-        for base_vertex, value, assignment in zip(base_vertices, values, labels):
+        for base_vertex, value, assignment in zip(self._base_vertices, instant_values, assignments):
             if assignment not in clusters:
-                clusters[assignment] = {'vertices': [], 'values': []}
-            clusters[assignment]['vertices'].append(base_vertex)
-            clusters[assignment]['values'].append(value[0])
+                clusters[assignment] = []
+            clusters[assignment].append(base_vertex)
 
-        for cluster, v in clusters.items():
-            if instant not in dbscan_clusters["instant"]:
-                dbscan_clusters["instant"][instant] = {"clusters": {"value": {}, "mean": None}}
+        # Join all individual clusters to outliers
+        final_clusters = {'outliers': {'nodes': [], 'intra_mean': 0.0}}
+        labels = {'outliers': []}
+        cluster_idx = 1
+        for assignment, nodes in clusters.items():
+            if len(nodes) == 1:
+                final_clusters['outliers']['nodes'].extend(nodes)
+                labels['outliers'].append(assignment)
+            else:
+                cluster_name = f'cluster_{cluster_idx}'
+                if cluster_name not in final_clusters:
+                    final_clusters[cluster_name] = {'nodes': []}
+                final_clusters[cluster_name]['nodes'].extend(nodes)
+                labels[cluster_name] = [assignment]
+                cluster_idx += 1
 
-            # Mean is the same as the sheaf model (resumed as std)
-            dbscan_clusters["instant"][instant]["clusters"]["value"][cluster] = {"nodes": v['vertices'],
-                                                                                 "mean":
-                                                                                     np.std(v['values'])}
+        # STEP 4: CLUSTERS ADDITIONAL INFO
+        # Define clusters info
+        instant_clusters_info = {"value": {}, "intra_mean": 0.0, "inter_mean": 0.0, "silhouette_score": 0.0}
 
-        # Retrieve the mean values for each clusters
-        mean_clusters_values = [v['mean'] for k, v in
-                                dbscan_clusters["instant"][instant]["clusters"]["value"].items()
-                                if v['mean']]
+        # Insert individual cluster intra-mean
+        for cluster_name, cluster_nodes in final_clusters.items():
+            # Calculate intra-cluster mean (with those nodes belonging to same cluster)
+            intra_cluster_mean = np.mean([np.mean(instant_values[self._dbscan.labels_ == i])
+                                          for i in labels[cluster_name]])
 
-        dbscan_clusters["instant"][instant]["clusters"]["mean"] = sum(mean_clusters_values) / len(
-            mean_clusters_values) if len(mean_clusters_values) > 0 else 0.0
+            instant_clusters_info["value"][cluster_name] = {'nodes': cluster_nodes['nodes'],
+                                                            'intra_mean': intra_cluster_mean}
 
-    mean_clusters_all_instants = [v for instant in range(len(input_time_series[0]))
-                                  for k, v in dbscan_clusters["instant"][instant]["clusters"].items() if
-                                  k == 'mean']
+        # Insert instant intra-mean
+        instant_clusters_info['intra_mean'] = np.mean([v['intra_mean']
+                                                       for k, v in instant_clusters_info['value'].items()])
 
-    # Remove None values
-    mean_clusters_all_instants = [x for x in mean_clusters_all_instants if x is not None]
+        # Insert instant inter-mean (with those nodes belonging to different clusters that are not themselves)
+        instant_clusters_info['inter_mean'] = np.mean([np.mean(instant_values[self._dbscan.labels_ != i])
+                                                       for i in range(len(list(instant_clusters_info["value"].keys())))]
+                                                      )
 
-    dbscan_clusters["mean"] = sum(mean_clusters_all_instants) / len(mean_clusters_all_instants) if len(
-        mean_clusters_all_instants) > 0 \
-        else 0.0
+        # Insert instant silhouette score
+        instant_clusters_info['silhouette'] = silhouette_score(instant_values, self._dbscan.labels_)
 
-    return dbscan_clusters
+        # Insert cluster intra means
+        self._clusters_history.insert_all_info_on_instant(instant, instant_clusters_info)
+
+    @property
+    def clusters_history(self):
+        """Getter for '_clusters_history'."""
+        return self._clusters_history
+
+    @clusters_history.setter
+    def clusters_history(self, value):
+        """Setter for '_clusters_history'."""
+        self._clusters_history = value
