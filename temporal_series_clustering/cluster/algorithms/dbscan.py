@@ -83,8 +83,12 @@ class DBscanClustering:
                                                        for i in range(len(list(instant_clusters_info["value"].keys())))]
                                                       )
 
-        # Insert instant silhouette score
-        instant_clusters_info['silhouette'] = silhouette_score(instant_values, self._dbscan.labels_)
+        # Only calculate silhouette if there is more than one single cluster, not counting outliers
+        if len(list(instant_clusters_info["value"].keys())) > 2:
+            # Insert instant silhouette score
+            instant_clusters_info['silhouette_score'] = silhouette_score(instant_values, self._dbscan.labels_)
+        else:
+            instant_clusters_info['silhouette_score'] = 0.0
 
         # Insert cluster intra means
         self._clusters_history.insert_all_info_on_instant(instant, instant_clusters_info)

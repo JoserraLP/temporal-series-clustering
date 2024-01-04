@@ -84,9 +84,12 @@ class KMeansClustering:
         instant_clusters_info['inter_mean'] = np.mean([np.mean(instant_values[self._kmeans.labels_ != i])
                                                        for i in range(self._kmeans.n_clusters)])
 
-        # Insert instant silhouette score
-        instant_clusters_info['silhouette'] = silhouette_score(instant_values, self._kmeans.labels_)
-
+        # Only calculate silhouette if there is more than one single cluster, not counting outliers
+        if len(list(instant_clusters_info["value"].keys())) > 2:
+            # Insert instant silhouette score
+            instant_clusters_info['silhouette'] = silhouette_score(instant_values, self._kmeans.labels_)
+        else:
+            instant_clusters_info['silhouette'] = 0.0
         # Insert cluster intra means
         self._clusters_history.insert_all_info_on_instant(instant, instant_clusters_info)
 
