@@ -3,8 +3,6 @@ from matplotlib import pyplot as plt
 
 from temporal_series_clustering.storage.epsilons import EpsilonValues
 
-results_dir = "../results/plots/"
-
 
 def show_instant_epsilons(epsilon_values: EpsilonValues):
     epsilon_instant_means = {k: [value['intra_mean'] for instant, value in v["instant"].items()]
@@ -135,8 +133,9 @@ def show_mean_num_clusters_epsilons(epsilon_values: EpsilonValues):
     plt.show()
 
 
-### From here on are the plots defined by Victor and Me
-def show_avg_all_instants_metric_against_epsilon(metric, epsilon_values: EpsilonValues, show_plots: bool = False):
+# From here on are the plots defined by Victor and Me
+def show_avg_all_instants_metric_against_epsilon(metric, epsilon_values: EpsilonValues, results_dir: str,
+                                                 show_plots: bool = False):
     data = {k: v[metric] for k, v in epsilon_values.info.items()}
 
     for i, (key, value) in enumerate(data.items()):
@@ -153,7 +152,7 @@ def show_avg_all_instants_metric_against_epsilon(metric, epsilon_values: Epsilon
         plt.clf()
 
 
-def show_metric_against_time(metric, epsilon_values: EpsilonValues, show_plots: bool = False):
+def show_metric_against_time(metric, epsilon_values: EpsilonValues, results_dir: str, show_plots: bool = False):
     metric_data = {k: [value[metric] for instant, value in v["instant"].items()]
                    for k, v in epsilon_values.info.items()}
 
@@ -200,7 +199,8 @@ def show_metric_against_time(metric, epsilon_values: EpsilonValues, show_plots: 
         plt.clf()
 
 
-def show_metric_against_time_by_epsilon(metric, epsilon, epsilon_values: EpsilonValues, show_plots: bool = False):
+def show_metric_against_time_by_epsilon(metric, epsilon, epsilon_values: EpsilonValues, results_dir: str,
+                                        show_plots: bool = False):
     metric_data = {k: [value[metric] for instant, value in v["instant"].items()]
                    for k, v in epsilon_values.info.items() if k == epsilon}
 
@@ -238,7 +238,7 @@ def show_metric_against_time_by_epsilon(metric, epsilon, epsilon_values: Epsilon
         plt.clf()
 
 
-def show_avg_num_clusters_against_epsilon(epsilon_values: EpsilonValues, show_plots: bool = False):
+def show_avg_num_clusters_against_epsilon(epsilon_values: EpsilonValues, results_dir: str, show_plots: bool = False):
     data = {k: len(list(v['instant'][instant]['value'].keys())) for k, v in epsilon_values.info.items()
             for instant, value in v["instant"].items()}
 
@@ -256,7 +256,7 @@ def show_avg_num_clusters_against_epsilon(epsilon_values: EpsilonValues, show_pl
         plt.clf()
 
 
-def show_num_clusters_against_time(epsilon_values: EpsilonValues, show_plots: bool = False):
+def show_num_clusters_against_time(epsilon_values: EpsilonValues, results_dir: str, show_plots: bool = False):
     data = {k: [len(list(v['instant'][instant]['value'].keys())) for instant, value in v["instant"].items()]
             for k, v in epsilon_values.info.items()}
 
@@ -274,7 +274,7 @@ def show_num_clusters_against_time(epsilon_values: EpsilonValues, show_plots: bo
 
 
 def show_global_metric_against_time_by_epsilon(metric: str, epsilon: float, epsilon_values: EpsilonValues,
-                                               show_plots: bool = False):
+                                               results_dir: str, show_plots: bool = False):
     data = {k: v[metric] for k, v in epsilon_values.info.items() if k == epsilon}
 
     if data:
