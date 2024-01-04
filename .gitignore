@@ -1,6 +1,7 @@
 clusters_imgs
 clusters
 epsilon_optimization
+results
 
 lib
 *.html
