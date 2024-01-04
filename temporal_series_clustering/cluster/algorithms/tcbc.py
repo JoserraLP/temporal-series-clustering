@@ -1,10 +1,8 @@
-import time
-
 from ordered_set import OrderedSet
 
 from temporal_series_clustering.cluster.graph_utils import get_cycles_info_from_graph, get_clusters_from_cycles, \
     filter_edges_by_epsilon
-from temporal_series_clustering.cluster.utils import create_outliers_cluster, rename_clusters
+from temporal_series_clustering.cluster.utils import rename_clusters
 from temporal_series_clustering.storage.clusters_history import ClustersHistory
 from temporal_series_clustering.storage.consistencies import ConsistenciesHistory
 from temporal_series_clustering.storage.simplified_graphs import SimplifiedGraphsHistory
@@ -18,20 +16,19 @@ class TCBC:
 
     def __init__(self, clusters_history: ClustersHistory, consistencies_history: ConsistenciesHistory,
                  simplified_graphs_history: SimplifiedGraphsHistory, base_vertices: list, epsilon: float,
-                 use_historical: list):
+                 use_historical: list, temporal_window: int = 5):
         self._clusters_history = clusters_history
         self._consistencies_history = consistencies_history
         self._simplified_graphs_history = simplified_graphs_history
         self._base_vertices = base_vertices
         self._epsilon = epsilon
         self._use_historical = use_historical
+        self._temporal_window = temporal_window
 
     def perform_all_instants_clustering(self):
         historical_info_used = []
-        start_time = time.time()
         # Iterate over all the instants
         for instant, instant_consistencies in self._consistencies_history.info.items():
-
             self._perform_instant_clustering(instant=instant, instant_consistencies=instant_consistencies,
                                              historical_info_used=historical_info_used)
 
@@ -50,7 +47,7 @@ class TCBC:
         simplified_graph = self._simplified_graphs_history.get_simplified_graph_on_instant(instant)
 
         # Retrieve the previous instant cluster
-        previous_clusters_nodes = self._clusters_history.get_cluster_nodes_on_instant(instant - 1)
+        previous_clusters = self.get_previous_clusters_info(instant)
 
         # STEP 1: CREATE SIMPLIFIED GRAPH
         # From the graph, create a simplified version where there are only store those nodes lower than epsilon
@@ -61,25 +58,13 @@ class TCBC:
         sorted_cycles = get_cycles_info_from_graph(filtered_G, instant_consistencies)
 
         # STEP 3: CLUSTERS
-        # If instant is not enabled for historical use
-        if instant not in self._use_historical:
-            previous_clusters_nodes = None
-
-        # Get all the clusters from the cycles and if the historical information has been used
-        instant_clusters, historical_info_instant_used = get_clusters_from_cycles(base_vertices=self._base_vertices,
-                                                                                  cycles=sorted_cycles,
-                                                                                  graph_nodes=filtered_G.nodes,
-                                                                                  instant=instant,
-                                                                                  instant_consistencies=
-                                                                                  instant_consistencies,
-                                                                                  previous_clusters_nodes=
-                                                                                  previous_clusters_nodes)
+        instant_clusters, conflicting_clusters, historical_info_instant_used = \
+            get_clusters_from_cycles(base_vertices=self._base_vertices, cliques=sorted_cycles,
+                                     graph_nodes=filtered_G.nodes, instant=instant,
+                                     instant_consistencies=instant_consistencies, previous_clusters=previous_clusters)
 
         # Add the instants on which the historical information has been used
         historical_info_used.extend(historical_info_instant_used)
-
-        # Create outliers cluster from individual nodes
-        instant_clusters = create_outliers_cluster(instant_clusters)
 
         # Rename the clusters
         instant_clusters = rename_clusters(instant_clusters)
@@ -88,6 +73,9 @@ class TCBC:
         # Firs it is required to create the clusters
         self._clusters_history.insert_cluster_metrics(instant=instant, clusters=instant_clusters,
                                                       instant_consistencies=instant_consistencies)
+
+        # Insert conflicting clusters
+        self._clusters_history.insert_conflicting_clusters(instant=instant, conflicting_clusters=conflicting_clusters)
 
         # Calculate the intra cluster mean
         self._clusters_history.calculate_instant_intra_mean(instant)
@@ -98,6 +86,34 @@ class TCBC:
 
         # Calculate the silhouette score
         self._clusters_history.calculate_instant_silhouette(instant, instant_consistencies=instant_consistencies)
+
+    def get_previous_clusters_info(self, instant):
+        previous_clusters = {}
+        # For the specified temporal window
+        for i in range(1, self._temporal_window + 1):
+            # Only store valid values
+            if instant - i >= 0:
+                clusters = {}
+                for cluster, nodes_in_cluster in self._clusters_history.get_cluster_nodes_on_instant(
+                        instant - i).items():
+                    # Iterate over the nodes in the cluster
+                    for node in nodes_in_cluster:
+                        # Add the node to the result dictionary with the list of nodes in its cluster
+                        clusters[node] = [n for n in nodes_in_cluster]
+
+                # store the clusters
+                previous_clusters[instant - i] = {'clusters': clusters,
+                                                  'conflicting_clusters':
+                                                      self._clusters_history.get_conflicting_clusters_on_instant(
+                                                          instant - i)}
+
+        # Sort the history
+        previous_clusters = dict(sorted(previous_clusters.items()))
+
+        if instant not in self._use_historical:
+            previous_clusters = None
+
+        return previous_clusters
 
     @property
     def clusters_history(self):

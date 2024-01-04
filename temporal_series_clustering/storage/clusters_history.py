@@ -52,6 +52,17 @@ class ClustersHistory:
                 'intra_mean': intra_mean_consistency_cluster
             }
 
+    def insert_conflicting_clusters(self, conflicting_clusters: list, instant: int):
+        """
+        Insert conflicting clusters into the storage
+
+        :param conflicting_clusters:
+        :param instant:
+        :return:
+        """
+        if instant in self._info:
+            self._info[instant]['conflicting_clusters'] = conflicting_clusters
+
     def calculate_instant_intra_mean(self, instant: int):
         """
         Calculate the intra_mean of the clusters for a given instant
@@ -73,6 +84,8 @@ class ClustersHistory:
         Calculate the inter_mean of the clusters for a given instant
 
         :param instant:
+        :param all_nodes:
+        :param instant_consistencies:
         :return:
         """
 
@@ -151,9 +164,9 @@ class ClustersHistory:
             for node in cluster:
                 labels[nodes.index(node)] = i
 
-        # Only calculate the silhouette when there is more than one cluster
+        # Only calculate the silhouette when there is more than one cluster or is less than labels
         silhouette_score_val = silhouette_score(distance_matrix, labels, metric='precomputed') if len(
-            clusters) > 1 else -1.0
+            clusters) > 1 and len(clusters) < len(labels) else 0.0
 
         # Calculate silhouette score
         self._info[instant]['silhouette_score'] = silhouette_score_val
@@ -171,6 +184,12 @@ class ClustersHistory:
             nodes_info = {k: v['nodes'] for k, v in self._info[instant]['value'].items()}
 
         return nodes_info
+
+    def get_conflicting_clusters_on_instant(self, instant: int):
+        conflicting_clusters = None
+        if instant in self._info:
+            conflicting_clusters = self._info[instant]['conflicting_clusters']
+        return conflicting_clusters
 
     def get_all_instants_mean(self, measure: str):
         """
