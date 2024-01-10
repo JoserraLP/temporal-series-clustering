@@ -5,9 +5,9 @@ import time
 import numpy as np
 
 from temporal_series_clustering.cluster.algorithms.tcbc import TCBC
-from temporal_series_clustering.cluster.utils import store_clusters_json
-from temporal_series_clustering.patterns.generators import predictor_city, \
-    create_simulation_specific_weekday, add_instant_variation, add_offset, smooth_edgy_values, combine_patterns
+from temporal_series_clustering.cluster.cluster_utils import store_clusters_json
+from temporal_series_clustering.patterns.experiment_patterns import generate_patterns
+
 from temporal_series_clustering.sheaf.sheaf_model import create_sheaf_model
 from temporal_series_clustering.sheaf.utils import propagate_sheaf_values
 from temporal_series_clustering.static.constants import ITEMS_PER_DAY
@@ -15,74 +15,6 @@ from temporal_series_clustering.storage.clusters_history import ClustersHistory
 from temporal_series_clustering.storage.consistencies import ConsistenciesHistory
 from temporal_series_clustering.storage.epsilons import EpsilonValues
 from temporal_series_clustering.storage.simplified_graphs import SimplifiedGraphsHistory
-
-
-def generate_patterns(weekday: str, total_num=50):
-    # Get the simulations of each predictor
-    a_simulation = create_simulation_specific_weekday(predictor_city, place_id='a', weekday=weekday)
-    b_simulation = create_simulation_specific_weekday(predictor_city, place_id='b', weekday=weekday)
-    c_simulation = create_simulation_specific_weekday(predictor_city, place_id='c', weekday=weekday)
-    d_simulation = create_simulation_specific_weekday(predictor_city, place_id='d', weekday=weekday)
-    e_simulation = create_simulation_specific_weekday(predictor_city, place_id='e', weekday=weekday)
-    f_simulation = create_simulation_specific_weekday(predictor_city, place_id='f', weekday=weekday)
-
-    predictors_output = [a_simulation, b_simulation, c_simulation, d_simulation, e_simulation, f_simulation]
-
-    # 6 patterns
-    # Get patterns with noise
-    instant_noise = 0.05
-    a_noise = add_instant_variation(a_simulation, noise_level=instant_noise)
-    b_noise = add_instant_variation(b_simulation, noise_level=instant_noise)
-    c_noise = add_instant_variation(c_simulation, noise_level=instant_noise)
-    d_noise = add_instant_variation(d_simulation, noise_level=instant_noise)
-    e_noise = add_instant_variation(e_simulation, noise_level=instant_noise)
-    f_noise = add_instant_variation(f_simulation, noise_level=instant_noise)
-
-    predictors_output.extend([a_noise, b_noise, c_noise, d_noise, e_noise, f_noise])
-
-    # 12 patterns
-    # Less noise
-    instant_noise = 0.01
-    a_noise = add_instant_variation(a_simulation, noise_level=instant_noise)
-    b_noise = add_instant_variation(b_simulation, noise_level=instant_noise)
-    c_noise = add_instant_variation(c_simulation, noise_level=instant_noise)
-    d_noise = add_instant_variation(d_simulation, noise_level=instant_noise)
-    e_noise = add_instant_variation(e_simulation, noise_level=instant_noise)
-    f_noise = add_instant_variation(f_simulation, noise_level=instant_noise)
-
-    predictors_output.extend([a_noise, b_noise, c_noise, d_noise, e_noise, f_noise])
-
-    # 18 patterns
-
-    # Add offset for original and noise patterns
-
-    np.random.seed(1)
-    offset = np.random.randint(-2, 2)
-    a_offset = add_offset(a_simulation, offset=offset)
-    offset = np.random.randint(-2, 2)
-    b_offset = add_offset(b_simulation, offset=offset)
-    offset = np.random.randint(-2, 2)
-    c_offset = add_offset(c_simulation, offset=offset)
-    offset = np.random.randint(-2, 2)
-    d_offset = add_offset(d_simulation, offset=offset)
-    offset = np.random.randint(-2, 2)
-    e_offset = add_offset(e_simulation, offset=offset)
-    offset = np.random.randint(-2, 2)
-    f_offset = add_offset(f_simulation, offset=offset)
-
-    predictors_output.extend([a_offset, b_offset, c_offset, d_offset, e_offset, f_offset])
-
-    # 24 patterns
-
-    # Combine remaining patterns
-    pattern_combinations = []
-    for i in range(total_num - len(predictors_output)):
-        # one more than the length as we want one more item due to range behavior
-        pattern_combinations.append(smooth_edgy_values(combine_patterns(predictors_output, seed=i)))
-
-    predictors_output.extend(pattern_combinations)
-
-    return predictors_output[:total_num]
 
 
 def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, base_vertices, use_historical: bool):
@@ -101,6 +33,7 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
 
     # Perform clustering per each possible epsilon
     for epsilon in np.arange(0.00, 0.30, 0.01):
+        epsilon = round(epsilon, 2)
         start_time = time.time()
         tcbc = TCBC(consistencies_history=consistencies_history,
                     clusters_history=ClustersHistory(),
@@ -145,8 +78,9 @@ def generate_characters(n):
 
 
 if __name__ == "__main__":
+    """
     # Define number of patterns
-    num_patterns = 64
+    num_patterns = 20
     # Generate patterns for each possible weekday
     weekday_patterns = generate_patterns(weekday="weekday", total_num=num_patterns)
     saturday_patterns = generate_patterns(weekday="saturday", total_num=num_patterns)
@@ -160,11 +94,17 @@ if __name__ == "__main__":
         pattern_concat = weekday_patterns[i] + saturday_patterns[i] + sunday_patterns[i]
         # Append to list of patterns
         patterns.append(pattern_concat)
+    """
+    # This is an example for studying clusters with same values
+
+    num_patterns = 21
+
+    patterns = generate_patterns(weekday="weekday", total_num=num_patterns)
 
     # Define a list indicating the instants on which use historical. Empty for no use
     use_historical = []
-    # All instants
-    # use_historical = [i for i in range(len(patterns[0]))]
+    # All instants except for the first 5 instants
+    use_historical = [i for i in range(len(patterns[0])) if i > 5]
 
     # Get base vertices
     base_vertices = generate_characters(num_patterns)
