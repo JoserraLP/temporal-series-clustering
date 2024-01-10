@@ -1,3 +1,5 @@
+import numpy as np
+
 from temporal_series_clustering.storage.clusters_history import ClustersHistory
 
 
@@ -29,7 +31,6 @@ class EpsilonValues:
         return epsilon_info
 
     def insert_all_info_on_epsilon(self, epsilon: str, clusters_history: ClustersHistory, historical_info_used: list):
-
         self._info[epsilon] = {
             'instant': clusters_history.info,
             'intra_mean': clusters_history.get_all_instants_mean('intra_mean'),
@@ -37,6 +38,76 @@ class EpsilonValues:
             'min_inter_mean': clusters_history.get_all_instants_mean('min_inter_mean'),
             'historical_info_used': historical_info_used
         }
+
+    def get_avg_num_clusters(self) -> dict:
+        """
+        Get average number of clusters without considering outliers per epsilon
+
+        :return: dict with average number of clusters per epsilon
+        :rtype: dict
+        """
+        return {k: np.mean([len([item for item in list(v['instant'][instant]['value'].keys()) if item != 'outliers'])
+                            for instant, value in v["instant"].items()])
+                for k, v in self._info.items()}
+
+    def get_num_clusters(self) -> dict:
+        """
+        Get number of clusters without considering outliers per epsilon
+
+        :return: dict with number of clusters per epsilon
+        :rtype: dict
+        """
+        return {k: [len([item for item in list(v['instant'][instant]['value'].keys()) if item != 'outliers'])
+                            for instant, value in v["instant"].items()]
+                for k, v in self._info.items()}
+
+    def get_avg_silhouette_score(self) -> dict:
+        """
+        Get average silhouette score per epsilon
+
+        :return: dict with silhouette score per epsilon
+        :rtype: dict
+        """
+        return {k: np.mean([value['silhouette_score'] for instant, value in v["instant"].items()])
+                for k, v in self._info.items()}
+
+    def get_instants_intra_mean(self):
+        """
+        Get instantaneous intra mean per epsilon
+
+        :return: dict with instantaneous intra mean per epsilon
+        :rtype: dict
+        """
+        return {k: [value['intra_mean'] for instant, value in v["instant"].items()]
+                for k, v in self._info.items()}
+
+    def get_instants_inter_mean(self):
+        """
+        Get instantaneous inter mean per epsilon
+
+        :return: dict with instantaneous inter mean per epsilon
+        :rtype: dict
+        """
+        return {k: [value['inter_mean'] for instant, value in v["instant"].items()]
+                for k, v in self._info.items()}
+
+    def get_avg_intra_mean(self):
+        """
+        Get average intra mean per epsilon
+
+        :return: dict with average intra mean per epsilon
+        :rtype: dict
+        """
+        return {k: v['intra_mean'] for k, v in self._info.items()}
+
+    def get_avg_inter_mean(self):
+        """
+        Get average inter mean per epsilon
+
+        :return: dict with average inter mean per epsilon
+        :rtype: dict
+        """
+        return {k: v['inter_mean'] for k, v in self._info.items()}
 
     @property
     def info(self):

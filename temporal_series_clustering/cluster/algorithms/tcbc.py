@@ -2,7 +2,7 @@ from ordered_set import OrderedSet
 
 from temporal_series_clustering.cluster.graph_utils import get_cycles_info_from_graph, get_clusters_from_cycles, \
     filter_edges_by_epsilon
-from temporal_series_clustering.cluster.utils import rename_clusters
+from temporal_series_clustering.cluster.cluster_utils import rename_clusters
 from temporal_series_clustering.storage.clusters_history import ClustersHistory
 from temporal_series_clustering.storage.consistencies import ConsistenciesHistory
 from temporal_series_clustering.storage.simplified_graphs import SimplifiedGraphsHistory
