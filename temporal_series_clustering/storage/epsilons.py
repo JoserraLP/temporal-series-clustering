@@ -23,7 +23,15 @@ class EpsilonValues:
         # In this dictionary all the information per each instant will be stored
         self._info = {}
 
-    def get_all_info_on_epsilon(self, epsilon: str):
+    def get_all_info_on_epsilon(self, epsilon: str) -> dict:
+        """
+        Get all the information related to a given epsilon
+
+        :param epsilon: epsilon to get the information
+        :type epsilon: str
+        :return: dict with the information of a given epsilon
+        :rtype: dict
+        """
         epsilon_info = None
         if epsilon in self._info:
             epsilon_info = self._info[epsilon]
@@ -31,6 +39,17 @@ class EpsilonValues:
         return epsilon_info
 
     def insert_all_info_on_epsilon(self, epsilon: str, clusters_history: ClustersHistory, historical_info_used: list):
+        """
+        Insert all the information for a given epsilon
+
+        :param epsilon: epsilon to store the information
+        :type epsilon: str
+        :param clusters_history: clusters information storage
+        :type clusters_history: ClustersHistory
+        :param historical_info_used: instants where historical information have been used
+        :type historical_info_used: list
+        :return:
+        """
         self._info[epsilon] = {
             'instant': clusters_history.info,
             'intra_mean': clusters_history.get_all_instants_mean('intra_mean'),

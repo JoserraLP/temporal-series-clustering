@@ -9,6 +9,12 @@ import networkx as nx
 
 # Method for combinations of data sources
 def identity(a):
+    """
+    Identity function
+
+    :param a: input value
+    :return: input value
+    """
     return a
 
 
@@ -61,11 +67,12 @@ def create_sheaf_model(input_vertices_labels: list):
     return sheaf
 
 
-def create_simplified_graph(num_vertices, instant_filtration):
+def create_simplified_graph(num_vertices: int, instant_consistency: dict) -> nx.Graph:
     """
     Create a simplified version of the sheaf model where the connections are only for base vertices.
-
-    DiGraph
+    
+    :param num_vertices: number of vertices from the full graph
+    :param instant_consistency: instant value for consistencies
 
     :return:
     """
@@ -81,14 +88,20 @@ def create_simplified_graph(num_vertices, instant_filtration):
     # Add nodes to the graph
     G.add_nodes_from(input_vertices_labels)
 
-    # Add edges to the graph with the instant value filtration
+    # Add edges to the graph with the instant value consistency
     for combination in combinations:
         # Round to six, but it should be parametrized
-        G.add_edge(combination[0], combination[1], consistency=round(instant_filtration['_'.join(combination)], 6))
+        G.add_edge(combination[0], combination[1], consistency=round(instant_consistency['_'.join(combination)], 6))
     return G
 
 
 def show_network(sheaf):
+    """
+    Show a sheaf model
+
+    :param sheaf: sheaf model
+    :return:
+    """
     nt = Network()
     # populates the nodes and edges data structures
     nt.from_nx(sheaf.visualize_sheaf_as_digraph())

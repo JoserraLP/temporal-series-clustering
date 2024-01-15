@@ -1,34 +1,44 @@
+import copy
+
 import networkx as nx
 import numpy as np
 
-from temporal_series_clustering.cluster.utils import find_key_of_item
+from temporal_series_clustering.cluster.utils import all_equal
 
 
-def get_cliques_by_graph(graph: nx.MultiDiGraph):
+def get_cliques_from_graph(graph: nx.Graph) -> list:
+    """
+    Get maximum cliques from a given graph
+
+    :param graph: input undirected graph
+    :type graph: nx.Graph
+    :return: list with cliques
+    :rtype: list
+    """
     # Bron–Kerbosch algorithm
     # Find all cliques from the undirected graph
-    return list(nx.find_cliques(graph.to_undirected()))
+    return list(nx.find_cliques(graph))
 
 
-def get_cycle_consistencies(cycle: list, consistencies: dict) -> list:
+def get_clique_consistencies(clique_nodes: list, consistencies: dict) -> list:
     """
-    Get the consistencies values for each item of the cycle
+    Get the consistencies values for each item of the clique
 
-    :param cycle: nodes cycle
-    :type cycle: list
+    :param clique_nodes: nodes of the clique
+    :type clique_nodes: list
     :param consistencies: dictionary with the consistencies
     :type consistencies: dict
-    :return: list with consistencies of the cycle nodes
+    :return: list with consistencies of the clique nodes
     :rtype: list
     """
     # Define the values list
     values = []
-    # Iterate over all elements of the cycle and its combinations
-    for i in range(len(cycle)):
-        for j in range(i + 1, len(cycle)):
+    # Iterate over all elements of the clique and its combinations
+    for i in range(len(clique_nodes)):
+        for j in range(i + 1, len(clique_nodes)):
             # Get keys for both possible directions
-            key1 = cycle[i] + '_' + cycle[j]
-            key2 = cycle[j] + '_' + cycle[i]
+            key1 = clique_nodes[i] + '_' + clique_nodes[j]
+            key2 = clique_nodes[j] + '_' + clique_nodes[i]
             # Store the value that exists
             if key1 in consistencies:
                 values.append(consistencies[key1])
@@ -37,123 +47,19 @@ def get_cycle_consistencies(cycle: list, consistencies: dict) -> list:
     return values
 
 
-def find_combined_cycle(cycles: list) -> list:
+def filter_edges_by_epsilon(G: nx.Graph, epsilon: float) -> nx.Graph:
     """
-    Find the cycle that is combination of the input cycles if exists
-
-    :param cycles: cycles to check
-    :type cycles: list
-    :return: list of combined cycles
-    :rtype: list
-    """
-    # Initialize an empty set to store the unique nodes
-    unique_nodes = set()
-
-    # Iterate over all the cycles
-    for cycle in cycles:
-        # Add the nodes of the current cycle to the set of unique nodes
-        unique_nodes.update(cycle)
-
-    # Convert the set of unique nodes back to a list
-    combined_cycle = list(unique_nodes)
-
-    return combined_cycle
-
-
-def find_min_length_cycles(G: nx.MultiDiGraph, source: str) -> list:
-    """
-    Find the minimum length cycles higher than 2 of length (avoiding leaves)
-
-    :param G: input graph
-    :type G: nx.MultiDiGraph
-    :param source: source node id
-    :type source: str
-    :return: list with minimum length cycles
-    :rtype: list
-    """
-    # Initialize a list to store all cycles
-    all_cycles = []
-
-    # Use Depth First Search  algorithm
-
-    # Recursive DFS function
-    def dfs(path):
-        # Get the last node in the path
-        node = path[-1]
-
-        # Get the neighbors of the node
-        neighbors = G.neighbors(node)
-
-        # Recursively call dfs for each neighbor that is not already in the path
-        for neighbor in neighbors:
-            if neighbor not in path:
-                dfs(path + [neighbor])
-            elif neighbor == source and len(path) > 2:
-                # If we've reached the source node and the path contains more than one node,
-                # add the current path to all_cycles
-                all_cycles.append(path + [neighbor])
-
-    # Call the DFS function with the source node as the starting path
-    dfs([source])
-
-    # Check if there are cycles
-    if all_cycles:
-        # Find the cycles with the minimum length
-        min_length = min(len(cycle) for cycle in all_cycles)
-        # Remove the last item of the cycle as it is the same as the first one
-        min_length_cycles = [cycle[:-1] for cycle in all_cycles if len(cycle) == min_length]
-    else:
-        # If there are no cycles, check the leaves and append them into the cycles
-        min_length_cycles = [(node, list(G.neighbors(node))[0]) for node in G.nodes() if G.out_degree(node) == 1]
-
-    return min_length_cycles
-
-
-def get_valid_cycles(G: nx.MultiDiGraph) -> list:
-    """
-    Get valid cycles (those with minimum length and its combinations)
-
-    :param G: input graph
-    :type G: nx.MultiDiGraph
-    :return: list with the cycles
-    :rtype: list
-    """
-    # Initialize the variable
-    all_min_length_cycles = {}
-    # Get all minimum length cycles for nodes on simplified graph
-    for node in G.nodes():
-        # Check if node not in some of the previous cycles
-        keys = find_key_of_item(node, all_min_length_cycles)
-        # If it is not stored previously
-        if keys is None:
-            # Retrieve the minimum length cycles
-            min_length_cycles = find_min_length_cycles(G, node)
-            # Get only those that have the node
-            all_min_length_cycles[node] = [cycle for cycle in min_length_cycles if node in cycle]
-
-    # Parse to list
-    all_combined_cycles = []
-    for k in list(all_min_length_cycles.keys()):
-        # Store the combined cycles
-        all_combined_cycles.append(find_combined_cycle(all_min_length_cycles[k]))
-
-    return all_combined_cycles
-
-
-def filter_edges_by_epsilon(G: nx.MultiDiGraph, epsilon: int) -> nx.MultiDiGraph:
-    """
-    Creates a new graph where there are only store the edges with a consistency value below epsilon and add the
-    bidirectional edges
+    Creates a new graph where there are only store the edges with a consistency value below epsilon
 
     :param G: input graph
     :type G: nx.MultiDiGraph
     :param epsilon: threshold
-    :type epsilon: int
+    :type epsilon: float
     :return: graph with filtered edges
-    :rtype: nx.MultiDiGraph
+    :rtype: nx.Graph
     """
     # Create a new graph
-    H = nx.MultiDiGraph()
+    H = nx.Graph()
 
     # Iterate over the edges in the original graph with the data
     for u, v, data in G.edges(data=True):
@@ -161,630 +67,417 @@ def filter_edges_by_epsilon(G: nx.MultiDiGraph, epsilon: int) -> nx.MultiDiGraph
         if data.get('consistency', float('inf')) < epsilon:
             H.add_edge(u, v, **data)
             # Also add the bidirectional edge
-            H.add_edge(v, u, **data)
+            # H.add_edge(v, u, **data)
 
     return H
 
 
-def get_cycles_info_from_graph(G: nx.MultiDiGraph, instant_consistencies: dict) -> list:
+def get_cliques_info_from_graph(G: nx.Graph, instant_consistencies: dict) -> list:
     """
-    Retrieve the cycles from a graph and sort them based on their mean consistency
+    Retrieve the maximum cliques from a graph and sort them based on their mean consistency
 
-    :param G: graph
-    :type G: nx.MultiDiGraph
+    :param G: undirected graph
+    :type G: nx.Graph
     :param instant_consistencies: current instant consistencies
     :type instant_consistencies: dict
-    :return: mean-based sorted graph cycles list
+    :return: mean-based sorted graph cliques list
     """
     # Get all the possible cliques on the graph
-    cycles = get_cliques_by_graph(G)
+    cliques = get_cliques_from_graph(G)
 
-    # Calculate the mean value of the cycle consistency
-    mean_consistency_cycles = []
-    for cycle in cycles:
-        # Retrieve the cycle consistencies per each cycle
-        cycle_consistencies = get_cycle_consistencies(cycle, instant_consistencies)
+    # Calculate the mean value of the clique consistency
+    mean_consistency_cliques = []
+    for clique in cliques:
+        # Retrieve the clique consistencies per each clique
+        clique_consistencies = get_clique_consistencies(clique, instant_consistencies)
         # Calculate the mean value of the consistency. If not valid set infinite as we search the minimum
-        mean_consistency = sum(cycle_consistencies) / len(cycle_consistencies) if cycle_consistencies else np.inf
+        mean_consistency = sum(clique_consistencies) / len(clique_consistencies) if clique_consistencies else np.inf
         # Append the mean consistency
-        mean_consistency_cycles.append(mean_consistency)
+        mean_consistency_cliques.append(mean_consistency)
 
-    # Order the cycles by their mean
+    # Order the cliques by their mean
 
-    # Create a list of tuples where each tuple is (mean, cycle)
-    cycles_tuples = list(zip(mean_consistency_cycles, cycles))
+    # Create a list of tuples where each tuple is (mean, clique)
+    cliques_tuples = list(zip(mean_consistency_cliques, cliques))
 
     # Sort the list of tuples
-    return sorted(cycles_tuples)
+    return sorted(cliques_tuples)
 
 
-def get_conflicting_clusters(cycles):
+def get_overlapping_clusters(cliques: list[tuple]) -> dict:
+    """
+    Get overlapping clusters from all the possible cliques
+
+    :param cliques: cliques with the nodes associated and its mean consistency
+    :type cliques: list[tuple]
+    :return: dict with overlapping clusters
+    :rtype: dict
+    """
     # Create a set to store elements that appear in more than one list
-    conflicting_nodes = set()
+    overlapping_nodes = set()
 
     # Create a set to store elements that have been seen
     seen_nodes = set()
 
-    # Retrieve conflicting nodes
+    # Retrieve overlapping nodes
     # Iterate over each list and each node in the list
-    for _, cycle in cycles:
-        for node in cycle:
-            # If the node has been seen before, add it to the conflicting nodes set
+    for _, clique in cliques:
+        for node in clique:
+            # If the node has been seen before, add it to the overlapping nodes set
             if node in seen_nodes:
-                conflicting_nodes.add(node)
+                overlapping_nodes.add(node)
             # Otherwise, add it to the seen nodes set
             else:
                 seen_nodes.add(node)
 
-    # Initialize an empty dictionary to store the results
-    conflicting_clusters = {}
-    # Iterate over each cycle in the list of cycles
-    for _, cycle in cycles:
-        # Iterate over the nodes of a cycle
-        for node in cycle:
-            # If node is conflicting
-            if node in conflicting_nodes:
-                # If not stored previously
-                if node not in conflicting_clusters:
-                    # Create a list
-                    conflicting_clusters[node] = []
-                # Append to list
-                conflicting_clusters[node].append(cycle)
+    # Initialize an empty dictionary to store the overlapping clusters
+    overlapping_clusters = {}
+    # Iterate over each clique in the list of cliques
+    for _, clique in cliques:
+        # Iterate over the nodes of a clique
+        for node in clique:
+            # If node is overlapping
+            if node in overlapping_nodes:
+                # If not stored previously on clusters
+                if node not in overlapping_clusters:
+                    # Create a list to
+                    overlapping_clusters[node] = []
+                # Append the clique to the node
+                overlapping_clusters[node].append(clique)
 
-    return conflicting_clusters
-
-
-def calculate_mean_consistency_from_node(node, possible_clusters, consistencies):
-    mean_consistencies = []
-    # This allows to get the mean from a node to the rest nodes of each possible cluster
-    for cluster in possible_clusters:
-        mean_value = []
-        for cluster_node in cluster:
-            if cluster_node != node:
-                mean_value.append(consistencies[f"{cluster_node}_{node}"] if f"{cluster_node}_{node}" in consistencies
-                                  else consistencies[f"{node}_{cluster_node}"])
-
-        mean_consistencies.append(sum(mean_value) / len(mean_value) if len(mean_value) > 0 else 0.0)
-
-    return mean_consistencies
+    return overlapping_clusters
 
 
-def get_subset_conflicting_clusters(conflicting_clusters):
-    # Check if the separate conflicting clusters have the same values, so it is possible to group them
-    # Remove the key from each list in the dictionary
-    print(f"... Input clusters are: {conflicting_clusters}")
-    clusters = {key: [item for item in value if item != key] for key, value in conflicting_clusters.items()}
-    print("...Getting subset of conflicting clusters...")
-    # Find keys that have the same subset
-    result = {}
-    for key, value in clusters.items():
-        value = tuple(sorted(value))  # Convert list to tuple so it can be used as a dictionary key
-        if value not in result:
-            result[value] = []
-        result[value].append(key)
-
-    # Combine the keys and their corresponding lists
-    combined_result = {keys[0]: sorted(list(value) + keys) for value, keys in result.items()}
-
-    print(f"Combined result is: {combined_result}")
-    # If there is not combination, return the input
-    if not combined_result:
-        combined_result = conflicting_clusters
-
-    return combined_result
-
-
-def get_clusters_from_nodes(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
-                            instant_consistencies: dict, previous_clusters_nodes: dict = None) -> dict:
+def recalculate_sort_cliques(cliques: list[tuple], consistencies: dict) -> list[tuple]:
     """
-    Get the clusters from the nodes of the graph
+    Recalculate the cliques mean consistency and sort by it
 
-    :param base_vertices: list with base vertices
-    :type base_vertices: list
-    :param graph_nodes: graph nodes
-    :type graph_nodes: list
-    :param cycles: all cycles along with its mean consistency value
-    :type cycles: list[tuple]
-    :param instant: instant for clustering
-    :type instant: int
-    :param instant_consistencies: instant consistencies dict
-    :type instant_consistencies: dict
-    :param previous_clusters_nodes: clusters for the previous instant. If None, do not enabled temporal clustering.
-    Default to None.
-    :type previous_clusters_nodes: dict
-    :return: dict with the clusters where there is a representative and the nodes belonging to that cluster
+    :param cliques: list with cliques mean and nodes
+    :type cliques: list[tuple]
+    :param consistencies: consistencies values
+    :type consistencies: dict
+    :return: sorted cliques with new means as tuples (mean, nodes)
+    :rtype: list[tuple]
     """
-    # Get conflicting clusters
-    conflicting_clusters = get_conflicting_clusters(cycles)
-
-    historical_info_used = []
-
-    # Check if there are conflicting nodes
-    if conflicting_clusters:
-        print("-" * 10)
-        print(f"INSTANT {instant}")
-        print(f"Conflicting nodes are: {list(conflicting_clusters.keys())}")
-        if previous_clusters_nodes:
-            print(f"Previous clusters are: {previous_clusters_nodes}")
-        clusters = {}
-        # Iterate over all conflicting clusters
-        for conflicting_node, possible_conflicting_clusters in conflicting_clusters.items():
-            check_distance = False
-            print(f"Conflicting node {conflicting_node} has clusters {possible_conflicting_clusters} ")
-            # Check if the historical info has the conflicting node on the values (not keys)
-            if previous_clusters_nodes and conflicting_node in \
-                    [node for cluster in previous_clusters_nodes.values() for node in cluster]:
-
-                # Retrieve the cluster it belongs to
-                previous_cluster = [v for k, v in previous_clusters_nodes.items() if conflicting_node in v]
-
-                # If there is a cluster
-                if previous_cluster:
-                    # If there is only one item on the cluster, it should be better to add to a new one, the closest
-                    # one, so enable the flag for checking distance
-                    if len(previous_cluster[0]) == 1:
-                        check_distance = True
-                    else:
-                        # Store the clusters as the previous value
-                        clusters[conflicting_node] = previous_cluster[0]
-                        # Append the instant when the historical information have been used
-                        historical_info_used.append(instant)
-                        print(f"Using historical info on {instant} with cluster {previous_cluster[0]}")
-            else:
-                check_distance = True
-
-            if check_distance:
-                # Get all those remaining nodes that are conflicting as they will be checked afterwards
-                # remaining_conflicting_nodes = [node for node in conflicting_clusters.keys() if node != conflicting_node]
-                # print(f"Remaining conflicting nodes for node {conflicting_node} are: {remaining_conflicting_nodes}")
-                # Remove them from the conflicting clusters
-                # possible_conflicting_clusters = [[item for item in sublist if item not in remaining_conflicting_nodes]
-                #                                for sublist in possible_conflicting_clusters]
-
-                print(f"Possible conflicting clusters are: {possible_conflicting_clusters}")
-
-                # Check to which cluster is closest, based on mean of consistency
-                mean_consistencies_node = calculate_mean_consistency_from_node(conflicting_node,
-                                                                               possible_conflicting_clusters,
-                                                                               consistencies=instant_consistencies)
-
-                print(f"Mean consistencies node {conflicting_node}: {mean_consistencies_node}")
-
-                # Get the index with lowest mean
-                argmin = np.argmin(mean_consistencies_node)
-
-                clusters[conflicting_node] = possible_conflicting_clusters[argmin]
-                print(f"Selected cluster for node {conflicting_node} is {clusters[conflicting_node]}")
-
-        # Gather subsets into bigger sets
-        # clusters = get_subset_conflicting_clusters(clusters)
-
-        # print(f"Clusters based on conflicting nodes are: {clusters}")
-
-        # Remove those nodes that have been stored previously and do something similar as down
-        remaining_nodes = set(base_vertices) - set([node for k, v in clusters.items() for node in v])
-
-        # print(f"Remaining nodes are: {remaining_nodes}")
-
-        # Check if there is some cycle with the remaining nodes
-        # Find the value and list where the nodes appear
-        remaining_cycles = {node: [item[1] for item in cycles if node in item[1]] for node in remaining_nodes}
-
-        # If there are cycles store like there are
-        for node, cycle in remaining_cycles.items():
-            # print(f"Node {node}")
-            if cycle:
-                # print(f"Processing cycle {cycle}")
-                # Remove the conflicting nodes if exists
-                cycle = [item for item in cycle[0] if item not in list(conflicting_clusters.keys())]
-                # print(f"Cycle - {cycle}")
-                # Check if the cycle does not exist
-                if cycle not in list(clusters.values()):
-                    # Store the cluster
-                    clusters[node] = cycle
-            else:
-                # Single cluster
-                clusters[node] = [node]
-
-        print(f"Final clusters are: {clusters}")
-
-    else:
-        # First initialize the clusters that are alone, not in the graph (which is filtered)
-        clusters = {item: [item] for item in set(base_vertices) - set(graph_nodes)}
-
-        # Iterate over the cycles
-        for mean_cycle, cycle in cycles:
-            # First check if the cycle is superset of the clusters
-            # Parse cycle to a set
-            set_cycle = set(cycle)
-            # Define a key for superset if found
-            superset_key = ''
-            # Iterate over the clusters to check if the cycle is a superset
-            for key, cluster_nodes in clusters.items():
-                # If the cycle set is a superset of the cluster nodes
-                if set_cycle.issuperset(set(cluster_nodes)):
-                    # Set the superset_key and stop iterating
-                    superset_key = key
-                    break
-
-            if superset_key:
-                # If it is a superset of any cluster, replace the previous value with the new cluster
-                clusters[superset_key] = cycle
-            else:
-                # Otherwise, get the nodes that are not represented yet in the clusters
-
-                # Flatten the list of values in the dictionary
-                existing_clusters_nodes = [item for sublist in clusters.values() for item in sublist]
-
-                # Filter the input cycle, so we have those nodes that are not previously stored in clusters
-                non_existing_nodes_cycle = [node for node in cycle if node not in existing_clusters_nodes]
-
-                # If there exist a cycle
-                if non_existing_nodes_cycle:
-                    # Add the cycle to the clusters
-                    clusters[non_existing_nodes_cycle[0]] = non_existing_nodes_cycle
-
-    return clusters, historical_info_used
-
-
-# NEW APPROACH
-
-def sort_clusters_intra_mean(cycles, consistencies):
-    # Get consistencies of the each cycle
-    cluster_consistencies = []
-    for cycle in cycles:
-        cycle_consistencies = get_cycle_consistencies(cycle[1], consistencies)
-        cluster_consistencies.append(
-            sum(cycle_consistencies) / len(cycle_consistencies) if len(cycle_consistencies) > 0 else 0.00)
-
-    # Create a list of tuples where each tuple is (mean, cycle)
-    cycles_tuples = list(zip(cluster_consistencies, [cycle[1] for cycle in cycles]))
-
-    return sorted(cycles_tuples)
-
-
-def get_repeated_clusters(current_cycles: list, previous_clusters: dict):
-    repeated_clusters = []
-    for _, cycle in current_cycles:
-        if cycle in list(previous_clusters.values()):
-            repeated_clusters.append(cycle)
-
-    return repeated_clusters
-
-
-def filter_min_length_cycles(sorted_cycles_list: list):
-    result_cycle = [cycle for _, cycle in sorted_cycles_list if len(cycle) > 1]
-    result_cycle_idx = [cycle for _, cycle in sorted_cycles_list].index(result_cycle[0]) if len(result_cycle) > 0 \
-        else -1
-
-    return result_cycle[0] if len(result_cycle) > 0 else [], result_cycle_idx
-
-
-def get_clusters_from_cycles_prev(base_vertices: list, graph_nodes: list, cycles: list[tuple], instant: int,
-                                  instant_consistencies: dict, previous_clusters_nodes: dict = None):
-    # Get conflicting clusters
-    conflicting_clusters = get_conflicting_clusters(cycles)
-
-    historical_info_used = []
-
-    clusters = {}
-
-    # Check if there are conflicting nodes
-    if conflicting_clusters:
-
-        # ----> Check if this is required
-        # Add individual nodes to cycles with 0.00 consistency as they are consistent with themselves
-        if set(base_vertices) - set(graph_nodes):
-            cycles.append((0.00, [item for item in set(base_vertices) - set(graph_nodes)]))
-            # cycles.extend([(0.00, [item]) for item in set(base_vertices) - set(graph_nodes)])
-
-        print(f"Possible cicles: {cycles}")
-
-        # Create a list those nodes that have been checked
-        nodes_checked = []
-        # Create a list for storing the final clusters
-        clusters_list = []
-
-        # Check historical information
-        if previous_clusters_nodes:
-            # Compare all current clusters to previous and get those that are equal
-            repeated_clusters = get_repeated_clusters(cycles, previous_clusters_nodes)
-
-            # Append to clusters list
-            clusters_list = repeated_clusters
-            # Append to nodes checked
-            nodes_checked = [item for cluster in repeated_clusters for item in cluster]
-
-            # Remove those repeated clusters from the cycles
-            cycles = [(mean, cycle) for mean, cycle in cycles if cycle not in repeated_clusters]
-
-            # Calculate and sort the new cycles without the checked nodes
-            for j in range(len(cycles)):
-                # Remove checked values
-                cycles[j] = [node for node in cycles[j][1] if node not in nodes_checked]
-
-                # Calculate new intra-means
-                cycles[j] = (get_cycle_consistencies(cycles[j], instant_consistencies),
-                             cycles[j])
-
-            # Insert instant for historical info
-            if clusters_list:
-                historical_info_used.append(instant)
-
-        # Sort the cluster by its average intra_mean
-        sorted_cycles_tuples = sort_clusters_intra_mean(cycles, instant_consistencies)
-
-        # Iterate until all nodes have been checked or there are no more cycles
-        while nodes_checked != graph_nodes and sorted_cycles_tuples:
-            # Use current information
-            # Get the cycle that is greater than single item
-            cycle, cycle_idx = filter_min_length_cycles(sorted_cycles_tuples)
-
-            # Get the minimum if not found, meaning get the first one
-            if not cycle:
-                # Get those nodes from cycle that have not been checked previously
-                cycle = [node for node in sorted_cycles_tuples[0][1] if node not in nodes_checked]
-
-                sorted_cycles_tuples.pop(0)
-
-            else:
-                # Pop removed cycle
-                sorted_cycles_tuples.pop(cycle_idx)
-
-            # Check if not stored previously
-            # ----> why it is necessary this if?
-            if cycle and not set(cycle).issubset(nodes_checked):
-
-                # Store nodes checked
-                nodes_checked += cycle
-                # Add cycle to clusters
-                clusters_list.append(cycle)
-
-                # Calculate and sort the new cycles without the checked nodes
-                for j in range(len(sorted_cycles_tuples)):
-                    # Remove checked values
-                    removed_nodes_cycle = [node for node in sorted_cycles_tuples[j][1] if node not in nodes_checked]
-
-                    if removed_nodes_cycle:
-                        cycle_consistencies = get_cycle_consistencies(removed_nodes_cycle, instant_consistencies)
-                        mean_consistencies = np.mean(cycle_consistencies) if cycle_consistencies else 0.0
-                        # Calculate new intra-means
-                        sorted_cycles_tuples[j] = (mean_consistencies if not np.isnan(mean_consistencies) else 0.0,
-                                                   removed_nodes_cycle)
-
-                # Sort again
-                sorted_cycles_tuples = sorted(sorted_cycles_tuples, key=lambda x: x[0])
-
-        # Store clusters as dict
-        for cluster in clusters_list:
-            if cluster:
-                clusters[cluster[0]] = cluster
-
-    else:
-        # First initialize the clusters that are alone, not in the graph (which is filtered)
-        clusters = {item: [item] for item in set(base_vertices) - set(graph_nodes)}
-
-        # Iterate over the cycles
-        for mean_cycle, cycle in cycles:
-            # First check if the cycle is superset of the clusters
-            # Parse cycle to a set
-            set_cycle = set(cycle)
-            # Define a key for superset if found
-            superset_key = ''
-            # Iterate over the clusters to check if the cycle is a superset
-            for key, cluster_nodes in clusters.items():
-                # If the cycle set is a superset of the cluster nodes
-                if set_cycle.issuperset(set(cluster_nodes)):
-                    # Set the superset_key and stop iterating
-                    superset_key = key
-                    break
-
-            if superset_key:
-                # If it is a superset of any cluster, replace the previous value with the new cluster
-                clusters[superset_key] = cycle
-            else:
-                # Otherwise, get the nodes that are not represented yet in the clusters
-
-                # Flatten the list of values in the dictionary
-                existing_clusters_nodes = [item for sublist in clusters.values() for item in sublist]
-
-                # Filter the input cycle, so we have those nodes that are not previously stored in clusters
-                non_existing_nodes_cycle = [node for node in cycle if node not in existing_clusters_nodes]
-
-                # If there exist a cycle
-                if non_existing_nodes_cycle:
-                    # Add the cycle to the clusters
-                    clusters[non_existing_nodes_cycle[0]] = non_existing_nodes_cycle
-
-    return clusters, historical_info_used
-
-
-def calculate_bayes_probability(conflicting_clusters, previous_clusters):
-    bayes_probabilities = {}
-
-    # print(f"Conflicting clusters are: {conflicting_clusters}")
-    # print(f"Previous info is: {previous_clusters}")
+    # Initialize clique consistencies list
+    clique_mean_consistencies = []
+
+    # Iterate over the cliques nodes (left the mean)
+    for _, clique_nodes in cliques:
+        # Retrieve the consistency for the clique nodes
+        clique_nodes_consistencies = get_clique_consistencies(clique_nodes=clique_nodes, consistencies=consistencies)
+        # Append the new mean consistency. If there is no value, set to 0
+        clique_mean_consistencies.append(sum(clique_nodes_consistencies) / len(clique_nodes_consistencies)
+                                         if len(clique_nodes_consistencies) > 0 else 0.00)
+
+    # Create a list of tuples where each tuple is (mean, clique_nodes)
+    cliques_tuples = list(zip(clique_mean_consistencies, [clique_nodes for _, clique_nodes in cliques]))
+
+    return sorted(cliques_tuples)
+
+
+def get_min_length_cliques(cliques: list[tuple]) -> list:
+    """
+    Retrieve the clique with minimum length (greater than 1) avoiding single nodes clusters
+
+    :param cliques: cliques
+    :type cliques: list[tuple]
+    :return: clique nodes with minimum length
+    :rtype: list
+    """
+    # Get those cliques with minimum length
+    min_length_cliques = [clique_nodes for _, clique_nodes in cliques if len(clique_nodes) > 1]
+    # Resulting clique if exists, otherwise empty list
+    resulting_clique = min_length_cliques[0] if len(min_length_cliques) > 0 else []
+    # Get the resulting clique index from the original list if exists, otherwise -1
+    resulting_clique_idx = [clique_nodes for _, clique_nodes in cliques].index(resulting_clique) \
+        if len(resulting_clique) > 0 else -1
+
+    return resulting_clique, resulting_clique_idx
+
+
+def calculate_temporal_binding_factor(overlapping_nodes: dict, previous_clusters: dict):
+    """
+    Calculate the temporal binding for each possible overlapping nodes
+
+    :param overlapping_nodes: dictionary with each overlapping node and the possible clusters it can belong
+    :type overlapping_nodes: dict
+    :param previous_clusters: dictionary with clusters (final and overlapping) on previous instants
+    :type previous_clusters: dict
+    :return: dict with temporal binding probability for each possible cluster on each overlapping node
+    """
+    # Define the temporal binding probabilities dict
+    temporal_binding_probabilities = {}
 
     # Another approach could be not checking that it is the same cluster but a subset or superset
+    # Iterate over the overlapping nodes
+    for overlapping_node, possible_clusters in overlapping_nodes.items():
+        # Create an empty list for each overlapping node
+        temporal_binding_probabilities[overlapping_node] = []
 
-    for conflicting_node, possible_clusters in conflicting_clusters.items():
-
-        # Create an empty list
-        bayes_probabilities[conflicting_node] = []
-        # Count number of times the node has been conflicting previously
-        conflicting_times = [1 if conflicting_node in info['conflicting_clusters'].keys() else 0
+        # Count number of times the node has been overlapping previously (it exists on 'overlapping_clusters' 
+        # from previous info)
+        overlapping_times = [1 if overlapping_node in info['overlapping_clusters'].keys() else 0
                              for _, info in previous_clusters.items()]
 
-        probability_conflicting_node = sum(conflicting_times) / len(conflicting_times)
+        # Calculate the probability by sum / length
+        p_n = sum(overlapping_times) / len(overlapping_times)
 
-        # Set default to 1 if do not appear previously
-        probability_conflicting_node = 1 if probability_conflicting_node == 0 else probability_conflicting_node
+        # Set the value of overlapping node to 1 if it does not appear previously. This avoids future errors
+        p_n = 1 if p_n == 0 else p_n
 
-        # print(f"For node {conflicting_node} the number of appearances is {conflicting_times}")
+        # Define list for both the probability of node n being overlapping and belonging to a given cluster c_t (p_n_ct)
+        #  and the probability of a cluster ct to appear (p_ct)
+        p_n_ct, p_ct = [], []
 
-        possible_clusters_prob, possible_clusters_conflicting_node_prob = [], []
-
+        # Iterate over each possible cluster
         for cluster in possible_clusters:
             # Count number of times the node has been on the cluster previously
-            cluster_times = [1 if conflicting_node in info['clusters'] and
-                                  set(info['clusters'][conflicting_node]) == set(cluster) else 0
-                             for _, info in previous_clusters.items()]
+            node_in_cluster_times = [1 if overlapping_node in info['clusters'] and
+                                          set(info['clusters'][overlapping_node]) == set(cluster) else 0
+                                     for _, info in previous_clusters.items()]
+            # Calculate the probability by sum / length
+            p_ct.append(sum(node_in_cluster_times) / len(node_in_cluster_times))
 
-            possible_clusters_prob.append(sum(cluster_times) / len(cluster_times))
-
-            # print(f"Cluster {cluster} appears previously a total of {cluster_times}")
-
-            # Check if there is conflicting clusters, the current clusters exists previously and the node was
-            # conflicting
-            cluster_conflicting_node_times = [1 if info['conflicting_clusters'].values() and
-                                                   cluster in list(info['conflicting_clusters'].values())[0]
-                                                   and conflicting_node in list(info['conflicting_clusters'].keys())
+            # Count the number of times the cluster is in previous overlapping clusters and the overlapping node was
+            # overlapping previously
+            cluster_overlapping_node_times = [1 if overlapping_node in info['overlapping_clusters'] and
+                                                   cluster in list(info['overlapping_clusters'][overlapping_node])
                                               else 0 for _, info in previous_clusters.items()]
+            # Calculate the probability by sum / length
+            p_n_ct.append(sum(cluster_overlapping_node_times) /
+                          len(cluster_overlapping_node_times))
 
-            possible_clusters_conflicting_node_prob.append(sum(cluster_conflicting_node_times) /
-                                                           len(cluster_conflicting_node_times))
+        # Calculate the temporal binding probability for each possible cluster on a given overlapping node
+        temporal_binding_probabilities[overlapping_node] = [p_n_ct[i] * p_ct[i] / p_n
+                                                            for i in range(len(possible_clusters))]
 
-            # print(f"Cluster {cluster} appears when node {conflicting_node} is conflicting previously a total of "
-            #       f"{cluster_conflicting_node_times}")
-
-        bayes_probabilities[conflicting_node] = [
-            possible_clusters_conflicting_node_prob[i] * possible_clusters_prob[i] / probability_conflicting_node for i
-            in range(len(possible_clusters))]
-
-    return bayes_probabilities
+    return temporal_binding_probabilities
 
 
-def get_clusters_from_cycles(base_vertices: list, graph_nodes: list, cliques: list[tuple], instant: int,
-                             instant_consistencies: dict, previous_clusters: dict = None):
-    conflicting_clusters = get_conflicting_clusters(cliques)
+def get_clusters_from_cliques(all_nodes: list, graph_nodes: list, cliques: list[tuple], instant: int,
+                              instant_consistencies: dict, previous_clusters: dict = None):
+    """
+    Get clusters from all the possible cliques on a given instant
 
-    historical_info_used = []
-
+    :param all_nodes: all nodes existent
+    :type all_nodes: list
+    :param graph_nodes: filtered graph nodes
+    :type graph_nodes: list
+    :param cliques: maximum cliques from filtered graph as tuple (mean, cliques_nodes)
+    :type cliques: list[tuple]
+    :param instant: current instant
+    :type instant: int
+    :param instant_consistencies: consistencies for the given instant
+    :type instant_consistencies: dict
+    :param previous_clusters: previous clusters information only enabled if historical info used. Default to None
+    :type previous_clusters: dict
+    :return: clusters dict, overlapping nodes and historical information used
+    """
+    # Create a list for storing instants where historical information have been used,
+    # a list those nodes that have been checked,
+    # a list for storing the final clusters as a list
+    historical_info_used, nodes_checked, clusters_list = [], [], []
+    # Create an output dict for final clusters
     clusters = {}
 
-    # Create a list those nodes that have been checked
-    nodes_checked = []
-    # Create a list for storing the final clusters
-    clusters_list = []
+    # First we get the overlapping nodes and clusters
+    overlapping_nodes = get_overlapping_clusters(cliques)
 
-    # Check if there are conflicting nodes
-    if conflicting_clusters:
+    # Check if there are overlapping nodes
+    if overlapping_nodes:
         # Check use the previous_clusters info
         if previous_clusters:
-            bayes_probability = calculate_bayes_probability(conflicting_clusters=conflicting_clusters,
-                                                            previous_clusters=previous_clusters)
+            # Get final clusters from historical information, nodes checked, new cliques (overwrite previous)
+            # and if the historical information has been used
+            clusters_list, nodes_checked, cliques, historical_info_used = \
+                get_final_clusters_from_historical(overlapping_nodes=overlapping_nodes,
+                                                   previous_clusters=previous_clusters,
+                                                   instant=instant, cliques=cliques,
+                                                   historical_info_used=historical_info_used)
 
-            # print(bayes_probability)
-            for node, probability in bayes_probability.items():
-                if all([v == 0.0 for v in probability]):  # All equal (equiprobable)
-                    # Select previous cluster directly if all new values has the same probability 0.0
-                    selected_cluster = previous_clusters[instant - 1]['clusters'][node]
-                else:
-                    # Otherwise get the cluster with the highest probability
-                    max_idx = probability.index(max(probability))
-                    selected_cluster = conflicting_clusters[node][max_idx]
-                clusters_list.append(selected_cluster)
-
-                # Append to nodes checked
-                nodes_checked.extend(selected_cluster)
-
-                # Remove from cliques the selected cluster
-                cliques = [item for item in cliques if item[1] != selected_cluster]
-
-            # Pop from cliques the checked nodes
-            cliques = [(0.00, [item for item in clique[1] if item not in nodes_checked]) for clique in cliques]
-
-            historical_info_used.append(instant)
-
-        if set(base_vertices) - set(graph_nodes):
-            cliques.append((0.00, [item for item in set(base_vertices) - set(graph_nodes)]))
-
-        # Sort the cluster by its average intra_mean
-        sorted_cycles_tuples = sort_clusters_intra_mean(cliques, instant_consistencies)
-
-        # Iterate until all nodes have been checked or there are no more cycles
-        while nodes_checked != graph_nodes and sorted_cycles_tuples:
-            # Use current information
-            # Get the cycle that is greater than single item
-            cycle, cycle_idx = filter_min_length_cycles(sorted_cycles_tuples)
-
-            # Get the minimum if not found, meaning get the first one
-            if not cycle:
-                # Get those nodes from cycle that have not been checked previously
-                cycle = [node for node in sorted_cycles_tuples[0][1] if node not in nodes_checked]
-
-                sorted_cycles_tuples.pop(0)
-
-            else:
-                # Pop removed cycle
-                sorted_cycles_tuples.pop(cycle_idx)
-
-            # Check if not stored previously
-            # ----> why it is necessary this if?
-            if cycle and not set(cycle).issubset(nodes_checked):
-
-                # Store nodes checked
-                nodes_checked += cycle
-                # Add cycle to clusters
-                clusters_list.append(cycle)
-
-                # Calculate and sort the new cycles without the checked nodes
-                for j in range(len(sorted_cycles_tuples)):
-                    # Remove checked values
-                    removed_nodes_cycle = [node for node in sorted_cycles_tuples[j][1] if
-                                           node not in nodes_checked]
-
-                    if removed_nodes_cycle:
-                        cycle_consistencies = get_cycle_consistencies(removed_nodes_cycle,
-                                                                      instant_consistencies)
-                        mean_consistencies = np.mean(cycle_consistencies) if cycle_consistencies else 0.0
-                        # Calculate new intra-means
-                        sorted_cycles_tuples[j] = (
-                            mean_consistencies if not np.isnan(mean_consistencies) else 0.0,
-                            removed_nodes_cycle)
-
-                # Sort again
-                sorted_cycles_tuples = sorted(sorted_cycles_tuples, key=lambda x: x[0])
-
-        # Store clusters as dict
-        for cluster in clusters_list:
-            if cluster:
-                clusters[cluster[0]] = cluster
+        # Get final clusters from overlapping nodes. If historical information, use previous values also
+        clusters = get_final_clusters_from_overlapping_nodes(all_nodes=all_nodes, graph_nodes=graph_nodes,
+                                                             cliques=cliques, nodes_checked=nodes_checked,
+                                                             clusters_list=clusters_list,
+                                                             instant_consistencies=instant_consistencies)
 
     else:
-        # First initialize the clusters that are alone, not in the graph (which is filtered)
-        clusters = {item: [item] for item in set(base_vertices) - set(graph_nodes)}
+        # Get final clusters from non overlapping nodes
+        clusters = get_final_clusters_from_non_overlapping_nodes(all_nodes=all_nodes, graph_nodes=graph_nodes,
+                                                                 cliques=cliques)
 
-        # Iterate over the cliques
-        for mean_clique, clique in cliques:
-            # First check if the clique is superset of the clusters
-            # Parse clique to a set
-            set_clique = set(clique)
-            # Define a key for superset if found
-            superset_key = ''
-            # Iterate over the clusters to check if the clique is a superset
-            for key, cluster_nodes in clusters.items():
-                # If the clique set is a superset of the cluster nodes
-                if set_clique.issuperset(set(cluster_nodes)):
-                    # Set the superset_key and stop iterating
-                    superset_key = key
-                    break
+    return clusters, overlapping_nodes, historical_info_used
 
-            if superset_key:
-                # If it is a superset of any cluster, replace the previous value with the new cluster
-                clusters[superset_key] = clique
-            else:
-                # Otherwise, get the nodes that are not represented yet in the clusters
 
-                # Flatten the list of values in the dictionary
-                existing_clusters_nodes = [item for sublist in clusters.values() for item in sublist]
+def get_final_clusters_from_non_overlapping_nodes(all_nodes: list, graph_nodes: list, cliques: list[tuple]):
+    """
+    Get final clusters when there are not overlapping nodes
 
-                # Filter the input clique, so we have those nodes that are not previously stored in clusters
-                non_existing_nodes_clique = [node for node in clique if node not in existing_clusters_nodes]
+    :param all_nodes: all nodes existent
+    :type all_nodes: list
+    :param graph_nodes: filtered graph nodes
+    :type graph_nodes: list
+    :param cliques: cliques from filtered graph as tuple (mean, cliques_nodes)
+    :type cliques: list[tuple]
+    :return:
+    """
+    # Important, in these cliques there can not be repeated nodes as there are no overlapping
 
-                # If there exist a clique
-                if non_existing_nodes_clique:
-                    # Add the clique to the clusters
-                    clusters[non_existing_nodes_clique[0]] = non_existing_nodes_clique
+    # First initialize the clusters that are alone, not in the graph (which is filtered)
+    clusters = {item: [item] for item in set(all_nodes) - set(graph_nodes)}
 
-    return clusters, conflicting_clusters, historical_info_used
+    # Iterate over the cliques, which are ordered by mean consistency
+    for clique_mean, clique_nodes in cliques:
+        # Check if the current clique is superset of any previous clusters except those individual
+        superset_key = [key for key, cluster_nodes in clusters.items() if
+                        set(clique_nodes).issuperset(set(cluster_nodes)) and len(cluster_nodes) > 1]
+
+        if superset_key:
+            # If it is a superset of any cluster, replace the previous value with the new cluster
+            # Access to item [0] as it is a list
+            clusters[superset_key[0]] = clique_nodes
+        else:
+            # Otherwise create a new cluster
+            clusters[clique_nodes[0]] = clique_nodes
+
+    return clusters
+
+
+def get_final_clusters_from_historical(overlapping_nodes: dict, previous_clusters: dict, instant: int,
+                                       cliques: list[tuple], historical_info_used: list):
+    """
+    Get final clusters when historical information is used, based on temporal binding factor
+
+    :param overlapping_nodes: overlapping nodes and its related overlapping clusters
+    :type overlapping_nodes: dict
+    :param previous_clusters: previous clusters information only enabled if historical info used. Default to None
+    :type previous_clusters: dict
+    :param instant: current instant
+    :type instant: int
+    :param cliques: maximum cliques from filtered graph as tuple (mean, cliques_nodes)
+    :type cliques: list[tuple]
+    :param historical_info_used: list for storing instant where historical info have been used
+    :type historical_info_used: list
+    :return: clusters lists, nodes checked, updated cliques and historical information
+    """
+    # Create a copy of the cliques
+    updated_cliques = copy.deepcopy(cliques)
+
+    # Define clusters and nodes checked lists
+    clusters_list, nodes_checked = [], []
+
+    # Calculate the temporal binding factor for each overlapping node
+    temporal_binding_factor = calculate_temporal_binding_factor(overlapping_nodes=overlapping_nodes,
+                                                                previous_clusters=previous_clusters)
+
+    # Iterate over the factor to select the best value for each node
+    for node, probabilities in temporal_binding_factor.items():
+        # All equal (equiprobable)
+        if all_equal(probabilities):
+            # Select previous cluster directly if all new values has the same probability
+            selected_cluster = previous_clusters[instant - 1]['clusters'][node]
+        else:
+            # Otherwise
+            # Get the index of the highest value
+            max_idx = probabilities.index(max(probabilities))
+            # Get the cluster with the highest probability value
+            selected_cluster = overlapping_nodes[node][max_idx]
+
+        # Append the selected cluster to the list
+        clusters_list.append(selected_cluster)
+
+        # Append to nodes checked
+        nodes_checked.extend(selected_cluster)
+
+        # Remove from updated cliques the selected cluster as it has been added
+        updated_cliques = [clique for clique in updated_cliques if clique[1] != selected_cluster]
+
+    # Pop the checked nodes from updated cliques, creating a new list without the nodes and a mean of 0.0 as it will
+    # be recalculated afterward
+    updated_cliques = [(0.00, [item for item in clique[1] if item not in nodes_checked]) for clique in updated_cliques]
+    # Append the instant as it has been used historical information
+    historical_info_used.append(instant)
+
+    return clusters_list, nodes_checked, updated_cliques, historical_info_used
+
+
+def get_final_clusters_from_overlapping_nodes(all_nodes: list, graph_nodes: list, cliques: list[tuple],
+                                              nodes_checked: list, clusters_list: list, instant_consistencies: dict):
+    """
+    Get final clusters from overlapping nodes
+
+    :param all_nodes: all nodes existent
+    :type all_nodes: list
+    :param graph_nodes: filtered graph nodes
+    :type graph_nodes: list
+    :param cliques: maximum cliques from filtered graph as tuple (mean, cliques_nodes)
+    :type cliques: list[tuple]
+    :param nodes_checked: list of nodes that have been checked
+    :type nodes_checked: list
+    :param clusters_list: list of clusters already created (with value if historical information used)
+    :type clusters_list: list
+    :param instant_consistencies: consistencies for the given instant
+    :type instant_consistencies: dict
+    :return: clusters dict
+    """
+    # Define the clusters dict
+    clusters = {}
+
+    # Append to cliques the individual clusters if there are. A default intra_mean of 0.00.
+    if set(all_nodes) - set(graph_nodes):
+        cliques.append((0.00, [item for item in set(all_nodes) - set(graph_nodes)]))
+
+    # Sort and recalculate the cluster by its average intra_mean
+    sorted_cliques_tuples = recalculate_sort_cliques(cliques, instant_consistencies)
+
+    # Iterate until all nodes have been checked or there are no more cliques
+    while nodes_checked != graph_nodes and sorted_cliques_tuples:
+        # Get the clique that is greater than single item
+        clique, clique_idx = get_min_length_cliques(sorted_cliques_tuples)
+
+        # If there are no clique greater than a single item
+        if not clique:
+            # Get those nodes from clique that have not been checked previously. Get first element
+            clique = [node for node in sorted_cliques_tuples[0][1] if node not in nodes_checked]
+            # Remove from sorted cliques the first element
+            sorted_cliques_tuples.pop(0)
+
+        else:
+            # Pop clique with more than one single item
+            sorted_cliques_tuples.pop(clique_idx)
+
+        # Check if clique is a subset of nodes_checked, meaning it has been stored previously
+        if clique and not set(clique).issubset(nodes_checked):
+            # Append nodes checked from the clique
+            nodes_checked += clique
+            # Add clique to clusters list
+            clusters_list.append(clique)
+
+            # Calculate and sort the new cliques without the checked nodes
+            for j in range(len(sorted_cliques_tuples)):
+                # Remove checked values
+                removed_nodes_clique = [node for node in sorted_cliques_tuples[j][1] if
+                                        node not in nodes_checked]
+
+                # If there is a clique with information
+                if removed_nodes_clique:
+                    # Get clique consistencies
+                    clique_consistencies = get_clique_consistencies(removed_nodes_clique, instant_consistencies)
+                    # Calculate the mean consistency
+                    mean_consistencies = sum(clique_consistencies) / len(clique_consistencies) \
+                        if len(clique_consistencies) > 0 else 0.00
+
+                    # Calculate new tuple of mean consistency and the clique without checked nodes
+                    sorted_cliques_tuples[j] = (mean_consistencies if not np.isnan(mean_consistencies) else 0.0,
+                                                removed_nodes_clique)
+
+            # Sort again by intra_mean and re-do the while
+            sorted_cliques_tuples = sorted(sorted_cliques_tuples, key=lambda x: x[0])
+
+    # Store clusters as dict, instead of list
+    for cluster in clusters_list:
+        if cluster:
+            clusters[cluster[0]] = cluster
+
+    return clusters

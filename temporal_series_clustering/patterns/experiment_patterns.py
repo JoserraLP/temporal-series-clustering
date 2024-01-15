@@ -4,7 +4,16 @@ from temporal_series_clustering.patterns.generators import predictor_city, \
     create_simulation_specific_weekday, add_instant_variation, add_offset, smooth_edgy_values, combine_patterns
 
 
-def generate_patterns(weekday: str, total_num=50):
+def generate_patterns(weekday: str, total_num: int = 50):
+    """
+    Generate all possible city time patterns: original, noisy, offset and random combinations
+
+    :param weekday: weekday to generate time pattern
+    :type weekday: str
+    :param total_num: total number of output patterns. Default to 50
+    :type total_num: int
+    :return: list of all time patterns
+    """
     # Get the simulations of each predictor
     a_simulation = create_simulation_specific_weekday(predictor_city, place_id='a', weekday=weekday)
     b_simulation = create_simulation_specific_weekday(predictor_city, place_id='b', weekday=weekday)
@@ -73,6 +82,15 @@ def generate_patterns(weekday: str, total_num=50):
 
 
 def generate_similar_patterns(weekday: str, total_num=21):
+    """
+    Generate similar all possible city time patterns: original and half-half patterns
+
+    :param weekday: weekday to generate time pattern
+    :type weekday: str
+    :param total_num: total number of output patterns. Default to 50
+    :type total_num: int
+    :return: list of all time patterns
+    """
     # Get the simulations of each predictor
     a_simulation = create_simulation_specific_weekday(predictor_city, place_id='a', weekday=weekday)
     b_simulation = create_simulation_specific_weekday(predictor_city, place_id='b', weekday=weekday)

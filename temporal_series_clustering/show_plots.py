@@ -35,8 +35,6 @@ def show_tcbc_experiment_metrics(historical: bool, num_sources: int):
 
     show_avg_num_clusters(epsilon_values)
 
-    exit()
-
     show_avg_all_instants_metric_against_epsilon(metric="intra_mean", epsilon_values=epsilon_values,
                                                  show_plots=show_plots, results_dir=path)
 
@@ -76,7 +74,7 @@ if __name__ == "__main__":
 
     # compare_tcbc_num_clusters_coherence(21)
 
-    # plot_cost_function_tcbc(21)  # On historical, the best epsilon is 0.11
+    plot_cost_function_tcbc(21)  # On historical, the best epsilon is 0.11
 
     # show_dbscan_avg_jumps(21)
 

@@ -1,20 +1,22 @@
 import tkinter as tk
 
-import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from temporal_series_clustering.patterns.generators import combine_patterns, smooth_edgy_values
-from temporal_series_clustering.patterns.generators import predictor_city, \
-    create_simulation_specific_weekday, add_instant_variation, add_offset
 
 class PatternPlotter(tk.Tk):
+    """
+    Pattern Plotter class for showing the different patterns on a Tkinter window
+
+    :param patterns: temporal patterns to show
+    """
+
     def __init__(self, patterns):
         tk.Tk.__init__(self)
         self.patterns = patterns
         self.current_pattern = 0
 
-        # Create the figure and the line that we will manipulate
+        # Create the figure and the line
         self.fig = Figure(figsize=(5, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.line, = self.ax.plot(patterns[0])
@@ -29,6 +31,7 @@ class PatternPlotter(tk.Tk):
         self.slider.pack(side=tk.BOTTOM, fill=tk.X)
 
     def update(self, event):
+        # Update the value of the figure
         self.current_pattern = int(self.slider.get())
         self.line.set_ydata(self.patterns[self.current_pattern])
         self.canvas.draw()

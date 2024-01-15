@@ -3,7 +3,7 @@ import copy
 import numpy as np
 from sklearn.metrics import silhouette_score
 
-from temporal_series_clustering.cluster.graph_utils import get_cycle_consistencies
+from temporal_series_clustering.cluster.graph_utils import get_clique_consistencies
 
 
 class ClustersHistory:
@@ -26,11 +26,27 @@ class ClustersHistory:
         self._info = {}
 
     def insert_all_info_on_instant(self, instant: int, instant_info: dict):
+        """
+        Insert/update the information on a given instant
+
+        :param instant: instant to store the information
+        :type instant: int
+        :param instant_info: instant information to store
+        :type instant_info: dict
+        :return: None
+        """
         self._info[instant] = instant_info
 
     def insert_cluster_metrics(self, clusters: dict, instant_consistencies: dict, instant: int):
         """
         Store the cluster metrics as the intra_mean
+
+        :param clusters: dict with clusters information
+        :type clusters: dict
+        :param instant: instant to insert the information
+        :type instant: int
+        :param instant_consistencies: consistencies for the given instant
+        :type instant_consistencies: dict
         :return: None
         """
         # If instant has not been created, initialize it
@@ -40,7 +56,7 @@ class ClustersHistory:
         # Iterate over the clusters nodes to get the mean consistency for a given instant
         for cluster_id, cluster in clusters.items():
             # Get consistencies of the cluster
-            cluster_consistencies = get_cycle_consistencies(cluster, instant_consistencies)
+            cluster_consistencies = get_clique_consistencies(cluster, instant_consistencies)
 
             # Calculate the intra_mean value of the consistency. If not valid set 0.0
             intra_mean_consistency_cluster = sum(cluster_consistencies) / len(cluster_consistencies) \
@@ -52,23 +68,13 @@ class ClustersHistory:
                 'intra_mean': intra_mean_consistency_cluster
             }
 
-    def insert_conflicting_clusters(self, conflicting_clusters: list, instant: int):
-        """
-        Insert conflicting clusters into the storage
-
-        :param conflicting_clusters:
-        :param instant:
-        :return:
-        """
-        if instant in self._info:
-            self._info[instant]['conflicting_clusters'] = conflicting_clusters
-
     def calculate_instant_intra_mean(self, instant: int):
         """
-        Calculate the intra_mean of the clusters for a given instant
+        Calculate the intra_mean of the clusters for a given instant. Default to 0.0
 
-        :param instant:
-        :return:
+        :param instant: instant to calculate the intra_mean
+        :type instant: int
+        :return: None
         """
         if instant in self._info:
             # Retrieve the mean values for each clusters
@@ -79,14 +85,17 @@ class ClustersHistory:
             self._info[instant]['intra_mean'] = sum(intra_mean_clusters_values) / len(intra_mean_clusters_values) \
                 if len(intra_mean_clusters_values) > 0 else 0.0
 
-    def calculate_instant_inter_mean(self, instant: int, all_nodes: list, instant_consistencies: dict):
+    def calculate_instant_inter_mean(self, instant: int, all_nodes: list, instant_consistencies: dict) -> None:
         """
-        Calculate the inter_mean of the clusters for a given instant
+        Calculate the inter_mean of the clusters for a given instant. Default 0.0
 
-        :param instant:
-        :param all_nodes:
-        :param instant_consistencies:
-        :return:
+        :param instant: instant to calculate the inter_mean
+        :type instant: int
+        :param all_nodes: all the nodes of the full graph
+        :type all_nodes: list
+        :param instant_consistencies: consistencies for the given instant
+        :type instant_consistencies: dict
+        :return: None
         """
 
         if instant in self._info:
@@ -136,7 +145,16 @@ class ClustersHistory:
             self._info[instant]['min_inter_mean'] = min(inter_consistencies_values) \
                 if len(inter_consistencies_values) > 0 else 0.0
 
-    def calculate_instant_silhouette(self, instant, instant_consistencies: dict):
+    def calculate_instant_silhouette(self, instant: int, instant_consistencies: dict):
+        """
+        Calculate silhouette score based on consistencies for a given instant. Default to 0.0
+
+        :param instant: instant to calculate the silhouette score
+        :type instant: int
+        :param instant_consistencies: consistencies for the given instant
+        :type instant_consistencies: dict
+        :return: None
+        """
         # Calculate the silhouette score
         nodes = sorted(set([node for k, nodes_cluster in self._info[instant]['value'].items()
                             for node in nodes_cluster['nodes']]))
@@ -172,31 +190,66 @@ class ClustersHistory:
         self._info[instant]['silhouette_score'] = silhouette_score_val
 
     def get_all_info_on_instant(self, instant: int):
+        """
+        Get all info for a given instant
+
+        :param instant: instant to retrieve all info
+        :type instant: int
+        :return: dict with the information if exists, None otherwise
+        """
         instant_info = None
         if instant in self._info:
             instant_info = self._info[instant]
 
         return instant_info
 
-    def get_cluster_nodes_on_instant(self, instant: int):
+    def get_cluster_nodes_on_instant(self, instant: int) -> dict:
+        """
+        Get cluster nodes on a given instant
+
+        :param instant: instant to retrieve nodes
+        :type instant: int
+        :return: dict with cluster name and cluster nodes
+        """
         nodes_info = None
         if instant in self._info:
             nodes_info = {k: v['nodes'] for k, v in self._info[instant]['value'].items()}
 
         return nodes_info
 
-    def get_conflicting_clusters_on_instant(self, instant: int):
-        conflicting_clusters = None
+    def insert_overlapping_clusters(self, overlapping_clusters: list, instant: int):
+        """
+        Insert overlapping clusters into the storage at a given instant
+
+        :param overlapping_clusters: overlapping clusters
+        :type overlapping_clusters: list
+        :param instant: instant to store the information
+        :type instant: int
+        :return: None
+        """
         if instant in self._info:
-            conflicting_clusters = self._info[instant]['conflicting_clusters']
-        return conflicting_clusters
+            self._info[instant]['overlapping_clusters'] = overlapping_clusters
+
+    def get_overlapping_clusters_on_instant(self, instant: int):
+        """
+        Get the overlapping nodes and clusters for a given instant
+
+        :param instant: instant to retrieve overlapping clusters
+        :type instant: int
+        :return: dict with the overlapping nodes and related overlapping clusters
+        """
+        overlapping_clusters = None
+        if instant in self._info:
+            overlapping_clusters = self._info[instant]['overlapping_clusters']
+        return overlapping_clusters
 
     def get_all_instants_mean(self, measure: str):
         """
         Get the mean of all instants defined by measure
 
         :param measure: type of mean. It can be 'intra_mean' or 'inter_mean'
-        :return:
+        :type measure: str
+        :return: mean of all instants for the given measure
         """
         # Retrieve the mean values for each instant on a list
         values = [v[measure] for instant, v in self._info.items() if measure in v]

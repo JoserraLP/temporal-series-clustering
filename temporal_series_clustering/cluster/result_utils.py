@@ -89,10 +89,13 @@ def calculate_cost_function(output_clusters_dir: str) -> pd.DataFrame:
     # Standarize all columns
     df_info = df_info.apply(lambda x: (x - x.mean()) / x.std())
 
+    # Define a factor alpha for weight of historical information
+    alpha = 0.5
+
     # Calculate cost function
     # Plus as we want to minimize the average number of jumps
-    # Minus as we want to maximize the average number of clusters and silhouette score
-    df_info['f'] = df_info['avg_jumps'] - df_info['avg_silhouette_score']
+    # Minus as we want to maximize the average silhouette score
+    df_info['f'] = alpha*df_info['avg_jumps'] - (1-alpha)*df_info['avg_silhouette_score']
     # avg_num_clusters removed -> lower epsilons will have lower cost function as they maximize num of clusters always
     # - df_info['avg_num_clusters']
 

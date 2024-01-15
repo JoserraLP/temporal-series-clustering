@@ -1,10 +1,14 @@
+import networkx as nx
+
 from temporal_series_clustering.sheaf.sheaf_model import create_simplified_graph
 from temporal_series_clustering.storage.consistencies import ConsistenciesHistory
 
 
 class SimplifiedGraphsHistory:
     """
-    Class storing the simplified graphs for all the instants based
+    Class storing the simplified graphs for all the instants
+
+    :param num_base_vertices: number of base vertices of the full graph
     """
 
     def __init__(self, num_base_vertices: int):
@@ -23,11 +27,17 @@ class SimplifiedGraphsHistory:
         # For each instant create the simplified graph based on sheaf model structure
         self._info = {instant:
                           create_simplified_graph(num_vertices=self._num_base_vertices,
-                                                  instant_filtration=
+                                                  instant_consistency=
                                                   consistencies_history.get_all_info_on_instant(instant))
                       for instant in range(consistencies_history.get_num_instants())}
 
-    def get_simplified_graph_on_instant(self, instant):
+    def get_simplified_graph_on_instant(self, instant: int) -> nx.Graph:
+        """
+        Get the simplified graph for a given instant
+
+        :param instant: instant to retrieve
+        :return: simplified graph
+        """
         return self._info[instant] if instant in self._info else None
 
     @property

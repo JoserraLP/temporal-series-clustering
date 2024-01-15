@@ -22,7 +22,7 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
     epsilon_values = EpsilonValues()
 
     # Create the simplified graphs
-    simplified_graphs = SimplifiedGraphsHistory(num_base_vertices=len(base_vertices))
+    simplified_graphs = SimplifiedGraphsHistory(num_base_vertices=len(all_nodes))
 
     simplified_graphs.create_simplified_graphs(consistencies_history=consistencies_history)
 
@@ -38,7 +38,7 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
         tcbc = TCBC(consistencies_history=consistencies_history,
                     clusters_history=ClustersHistory(),
                     simplified_graphs_history=simplified_graphs,
-                    base_vertices=base_vertices,
+                    all_nodes=base_vertices,
                     epsilon=epsilon,
                     use_historical=use_historical)
 
@@ -52,9 +52,9 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
 
         # Store epsilon file
         store_clusters_json(epsilon_values.info,
-                            f'../results/experiment_{len(base_vertices)}_sources_{sufix}historical.json')
+                            f'../results/experiment_{len(all_nodes)}_sources_{sufix}historical.json')
 
-        with open(f'../results/experiment_{len(base_vertices)}_sources_times_{sufix}historical.json', 'w') as f:
+        with open(f'../results/experiment_{len(all_nodes)}_sources_times_{sufix}historical.json', 'w') as f:
             json.dump(total_times, f)
 
     return epsilon_values
@@ -107,22 +107,22 @@ if __name__ == "__main__":
     use_historical = [i for i in range(len(patterns[0])) if i > 5]
 
     # Get base vertices
-    base_vertices = generate_characters(num_patterns)
+    all_nodes = generate_characters(num_patterns)
     # Create sheaf model with base vertices
-    sheaf_model = create_sheaf_model(base_vertices)
+    sheaf_model = create_sheaf_model(all_nodes)
 
     # For testing purposes we are going to generate the output for each predictor
     reading_freq = 1
 
     summary, filtration, mean, values = propagate_sheaf_values(sheaf=sheaf_model,
-                                                               predictors_output=patterns,
+                                                               data_sources_output=patterns,
                                                                reading_freq=reading_freq,
-                                                               num_items=ITEMS_PER_DAY,
-                                                               base_vertices=base_vertices)
+                                                               pattern_length=ITEMS_PER_DAY,
+                                                               base_vertices=all_nodes)
 
     # Create the different storages
     consistencies_history = ConsistenciesHistory(filtration)
 
-    epsilon_values = perform_epsilon_optimization(base_vertices=base_vertices,
+    epsilon_values = perform_epsilon_optimization(base_vertices=all_nodes,
                                                   consistencies_history=consistencies_history,
                                                   use_historical=use_historical)
