@@ -14,23 +14,30 @@ class TCBC:
 
     :param clusters_history: storage for clusters information
     :param consistencies_history: storage for consistencies information
+    :param values_history: storage for input sources values information
     :param simplified_graphs_history: storage for simplified graphs information
     :param all_nodes: all nodes existent in system
     :param epsilon: value threshold for overlapping nodes
     :param use_historical: list with the intervals on which apply temporal binding algorithm
     :param temporal_window: temporal window used for temporal binding algorithm
+    :param temporal_offset: offset to consider current instant on previous full pattern. If 0, do not consider it,
+        just use previous instants
     """
 
     def __init__(self, clusters_history: ClustersHistory, consistencies_history: ConsistenciesHistory,
-                 simplified_graphs_history: SimplifiedGraphsHistory, all_nodes: list, epsilon: float,
-                 use_historical: list, temporal_window: int = 5):
+                 values_history: ConsistenciesHistory,
+                 simplified_graphs_history: SimplifiedGraphsHistory,
+                 all_nodes: list, epsilon: float,
+                 use_historical: list, temporal_window: int = 5, temporal_offset: int = 0):
         self._clusters_history = clusters_history
         self._consistencies_history = consistencies_history
+        self._values_history = values_history
         self._simplified_graphs_history = simplified_graphs_history
         self._base_nodes = all_nodes
         self._epsilon = epsilon
         self._use_historical = use_historical
         self._temporal_window = temporal_window
+        self._temporal_offset = temporal_offset
 
     def perform_all_instants_clustering(self) -> OrderedSet:
         """
@@ -44,11 +51,13 @@ class TCBC:
         for instant, instant_consistencies in self._consistencies_history.info.items():
             # Perform instant clustering
             self._perform_instant_clustering(instant=instant, instant_consistencies=instant_consistencies,
-                                             historical_info_used=historical_info_used)
+                                             historical_info_used=historical_info_used,
+                                             instant_values=self._values_history.get_all_info_on_instant(instant))
         # Return an ordered set of the historical information used
         return OrderedSet(historical_info_used)
 
-    def _perform_instant_clustering(self, instant: int, instant_consistencies: dict, historical_info_used: list):
+    def _perform_instant_clustering(self, instant: int, instant_consistencies: dict, historical_info_used: list,
+                                    instant_values: dict):
         """
         Perform the clustering for a given instant
 
@@ -56,6 +65,8 @@ class TCBC:
         :type instant: int
         :param instant_consistencies: consistencies for the given instant
         :type instant_consistencies: dict
+        :param instant_values: input sources values for the given instant
+        :type instant_values: dict
         :param historical_info_used: list with the historical information used
         :type historical_info_used: list
         :return:
@@ -79,7 +90,8 @@ class TCBC:
         instant_clusters, overlapping_clusters, historical_info_instant_used = \
             get_clusters_from_cliques(all_nodes=self._base_nodes, cliques=sorted_cliques,
                                       graph_nodes=filtered_G.nodes, instant=instant,
-                                      instant_consistencies=instant_consistencies, previous_clusters=previous_clusters)
+                                      instant_consistencies=instant_consistencies, previous_clusters=previous_clusters,
+                                      temporal_offset=self._temporal_offset)
 
         # Add the instants on which the historical information has been used
         historical_info_used.extend(historical_info_instant_used)
@@ -90,7 +102,8 @@ class TCBC:
         # STEP 4: CLUSTERS ADDITIONAL INFO
         # Firs it is required to create the clusters
         self._clusters_history.insert_cluster_metrics(instant=instant, clusters=instant_clusters,
-                                                      instant_consistencies=instant_consistencies)
+                                                      instant_consistencies=instant_consistencies,
+                                                      instant_values=instant_values)
 
         # Insert overlapping clusters
         self._clusters_history.insert_overlapping_clusters(instant=instant, overlapping_clusters=overlapping_clusters)
@@ -123,22 +136,24 @@ class TCBC:
             # For the specified temporal window
             for i in range(1, self._temporal_window + 1):
                 # Only store valid values (negative instants do not exists)
-                if instant - i >= 0:
+                previous_instant = instant - i if self._temporal_offset == 0 else instant - self._temporal_offset*i
+                if previous_instant >= 0:
+
                     # Define a dict for final clusters for a given instant
                     final_clusters = {}
                     # Iterate over the cluster nodes
                     for cluster_nodes in \
-                            list(self._clusters_history.get_cluster_nodes_on_instant(instant - i).values()):
+                            list(self._clusters_history.get_cluster_nodes_on_instant(previous_instant).values()):
                         # Iterate over the nodes in the cluster
                         for node in cluster_nodes:
                             # Add the node to the result dictionary with the list of nodes in its cluster
                             final_clusters[node] = [n for n in cluster_nodes]
 
                     # Store both the final and previous overlapping clusters
-                    previous_clusters[instant - i] = \
+                    previous_clusters[previous_instant] = \
                         {'clusters': final_clusters,
                          'overlapping_clusters':
-                             self._clusters_history.get_overlapping_clusters_on_instant(instant - i)}
+                             self._clusters_history.get_overlapping_clusters_on_instant(previous_instant)}
 
             # Sort the history by instant
             previous_clusters = dict(sorted(previous_clusters.items()))

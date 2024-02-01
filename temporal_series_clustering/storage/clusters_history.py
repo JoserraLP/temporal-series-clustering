@@ -3,7 +3,7 @@ import copy
 import numpy as np
 from sklearn.metrics import silhouette_score
 
-from temporal_series_clustering.cluster.graph_utils import get_clique_consistencies
+from temporal_series_clustering.cluster.graph_utils import get_clique_consistencies, get_clique_mean_value
 
 
 class ClustersHistory:
@@ -37,7 +37,8 @@ class ClustersHistory:
         """
         self._info[instant] = instant_info
 
-    def insert_cluster_metrics(self, clusters: dict, instant_consistencies: dict, instant: int):
+    def insert_cluster_metrics(self, clusters: dict, instant_consistencies: dict, instant: int,
+                               instant_values: dict):
         """
         Store the cluster metrics as the intra_mean
 
@@ -47,6 +48,8 @@ class ClustersHistory:
         :type instant: int
         :param instant_consistencies: consistencies for the given instant
         :type instant_consistencies: dict
+        :param instant_values: input sources values for the given instant
+        :type instant_values: dict
         :return: None
         """
         # If instant has not been created, initialize it
@@ -65,7 +68,8 @@ class ClustersHistory:
             # Insert into the historical info (nodes and intra_mean)
             self._info[instant]['value'][cluster_id] = {
                 'nodes': cluster,
-                'intra_mean': intra_mean_consistency_cluster
+                'intra_mean': intra_mean_consistency_cluster,
+                'values_mean': get_clique_mean_value(clique_nodes=cluster, values=instant_values)
             }
 
     def calculate_instant_intra_mean(self, instant: int):

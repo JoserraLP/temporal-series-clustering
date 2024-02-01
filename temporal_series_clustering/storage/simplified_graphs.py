@@ -16,19 +16,21 @@ class SimplifiedGraphsHistory:
         self._info = {}
         self._num_base_vertices = num_base_vertices
 
-    def create_simplified_graphs(self, consistencies_history: ConsistenciesHistory):
+    def create_simplified_graphs(self, consistencies_history: ConsistenciesHistory, input_vertices_labels=None):
         """
         Create a simplified version (graph) of the sheaf model per each instant of simulation
 
         :param consistencies_history: input sheaf model consistencies values
         :type consistencies_history: ConsistenciesHistory
+        :param input_vertices_labels: input vertices names
         :return: None
         """
         # For each instant create the simplified graph based on sheaf model structure
         self._info = {instant:
                           create_simplified_graph(num_vertices=self._num_base_vertices,
                                                   instant_consistency=
-                                                  consistencies_history.get_all_info_on_instant(instant))
+                                                  consistencies_history.get_all_info_on_instant(instant),
+                                                  input_vertices_labels=input_vertices_labels)
                       for instant in range(consistencies_history.get_num_instants())}
 
     def get_simplified_graph_on_instant(self, instant: int) -> nx.Graph:

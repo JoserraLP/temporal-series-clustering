@@ -67,20 +67,22 @@ def create_sheaf_model(input_vertices_labels: list):
     return sheaf
 
 
-def create_simplified_graph(num_vertices: int, instant_consistency: dict) -> nx.Graph:
+def create_simplified_graph(num_vertices: int, instant_consistency: dict, input_vertices_labels=None) -> nx.Graph:
     """
     Create a simplified version of the sheaf model where the connections are only for base vertices.
-    
+
     :param num_vertices: number of vertices from the full graph
     :param instant_consistency: instant value for consistencies
+    :param input_vertices_labels: input vertices names
 
     :return:
     """
     # List of strings representing alphabet on uppercase
-    input_vertices_labels = list(string.ascii_uppercase)[:num_vertices]
+    vertices_labels = list(string.ascii_uppercase)[:num_vertices] if not input_vertices_labels \
+        else input_vertices_labels
 
     # Generate all possible relations (combinations of 2) between the strings
-    combinations = list(itertools.combinations(input_vertices_labels, 2))
+    combinations = list(itertools.combinations(vertices_labels, 2))
 
     # Create the graph
     G = nx.Graph()

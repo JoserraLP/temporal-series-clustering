@@ -6,7 +6,7 @@ import numpy as np
 
 from temporal_series_clustering.cluster.algorithms.tcbc import TCBC
 from temporal_series_clustering.cluster.cluster_utils import store_clusters_json
-from temporal_series_clustering.patterns.experiment_patterns import generate_patterns
+from temporal_series_clustering.patterns.experiment_patterns import *
 
 from temporal_series_clustering.sheaf.sheaf_model import create_sheaf_model
 from temporal_series_clustering.sheaf.utils import propagate_sheaf_values
@@ -17,7 +17,17 @@ from temporal_series_clustering.storage.epsilons import EpsilonValues
 from temporal_series_clustering.storage.simplified_graphs import SimplifiedGraphsHistory
 
 
-def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, base_vertices, use_historical: bool):
+def remove_key(d, key):
+    if key in d:
+        del d[key]
+    for k, v in d.items():
+        if isinstance(v, dict):
+            remove_key(v, key)
+    return d
+
+
+def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, base_vertices, use_historical: bool,
+                                 temporal_window, temporal_offset, values_history):
     # Define epsilon values object
     epsilon_values = EpsilonValues()
 
@@ -40,7 +50,10 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
                     simplified_graphs_history=simplified_graphs,
                     all_nodes=base_vertices,
                     epsilon=epsilon,
-                    use_historical=use_historical)
+                    use_historical=use_historical,
+                    temporal_window=temporal_window,
+                    temporal_offset=temporal_offset,
+                    values_history=values_history)
 
         historical_info_used = tcbc.perform_all_instants_clustering()
 
@@ -50,8 +63,10 @@ def perform_epsilon_optimization(consistencies_history: ConsistenciesHistory, ba
         total_times[epsilon] = time.time() - start_time
         print(f"On epsilon {epsilon}, lasted time {time.time() - start_time}")
 
+        epsilon_values_filtered = remove_key(epsilon_values.info, 'overlapping_clusters')
+
         # Store epsilon file
-        store_clusters_json(epsilon_values.info,
+        store_clusters_json(epsilon_values_filtered,
                             f'../results/experiment_{len(all_nodes)}_sources_{sufix}historical.json')
 
         with open(f'../results/experiment_{len(all_nodes)}_sources_times_{sufix}historical.json', 'w') as f:
@@ -78,9 +93,9 @@ def generate_characters(n):
 
 
 if __name__ == "__main__":
-    """
-    # Define number of patterns
-    num_patterns = 20
+    """ Six original sources
+    num_patterns = 6
+
     # Generate patterns for each possible weekday
     weekday_patterns = generate_patterns(weekday="weekday", total_num=num_patterns)
     saturday_patterns = generate_patterns(weekday="saturday", total_num=num_patterns)
@@ -95,16 +110,22 @@ if __name__ == "__main__":
         # Append to list of patterns
         patterns.append(pattern_concat)
     """
-    # This is an example for studying clusters with same values
+    # With the seventh pattern as combination of best epsilon clusters
+    num_patterns = 6
+    # Temporal window and offset
+    temporal_window = 5
+    temporal_offset = 24
 
-    num_patterns = 21
+    patterns = generate_weeks_base_patterns(total_weeks=6)
 
-    patterns = generate_patterns(weekday="weekday", total_num=num_patterns)
+    # Add little noise to each one of the patterns
+    for i in range(len(patterns)):
+        patterns[i] = add_instant_variation(patterns[i], noise_level=0.02)
 
     # Define a list indicating the instants on which use historical. Empty for no use
     use_historical = []
-    # All instants except for the first 5 instants
-    use_historical = [i for i in range(len(patterns[0])) if i > 5]
+    # All instants except
+    # use_historical = [i for i in range(len(patterns[0]))]
 
     # Get base vertices
     all_nodes = generate_characters(num_patterns)
@@ -117,12 +138,19 @@ if __name__ == "__main__":
     summary, filtration, mean, values = propagate_sheaf_values(sheaf=sheaf_model,
                                                                data_sources_output=patterns,
                                                                reading_freq=reading_freq,
-                                                               pattern_length=ITEMS_PER_DAY,
+                                                               pattern_length=len(patterns[0]),
                                                                base_vertices=all_nodes)
+
+    # Store the actual values of each pattern for each instant as the filtration
+    source_values = {i: {all_nodes[j]: patterns[j][i] for j in range(len(all_nodes))} for i in range(len(patterns[0]))}
 
     # Create the different storages
     consistencies_history = ConsistenciesHistory(filtration)
+    values_history = ConsistenciesHistory(source_values)
 
     epsilon_values = perform_epsilon_optimization(base_vertices=all_nodes,
                                                   consistencies_history=consistencies_history,
-                                                  use_historical=use_historical)
+                                                  use_historical=use_historical,
+                                                  temporal_window=temporal_window,
+                                                  temporal_offset=temporal_offset,
+                                                  values_history=values_history)

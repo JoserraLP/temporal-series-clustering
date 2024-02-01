@@ -20,6 +20,20 @@ def get_cliques_from_graph(graph: nx.Graph) -> list:
     return list(nx.find_cliques(graph))
 
 
+def get_clique_mean_value(clique_nodes: list, values: dict):
+    """
+    Get the clique mean value
+
+    :param clique_nodes: nodes of the clique
+    :type clique_nodes: list
+    :param values: dictionary with the values
+    :type values: dict
+    :return: float with mean value of the clique nodes
+    :rtype: float
+    """
+    return np.mean([value for source, value in values.items() if source in clique_nodes])
+
+
 def get_clique_consistencies(clique_nodes: list, consistencies: dict) -> list:
     """
     Get the consistencies values for each item of the clique
@@ -256,7 +270,7 @@ def calculate_temporal_binding_factor(overlapping_nodes: dict, previous_clusters
 
 
 def get_clusters_from_cliques(all_nodes: list, graph_nodes: list, cliques: list[tuple], instant: int,
-                              instant_consistencies: dict, previous_clusters: dict = None):
+                              instant_consistencies: dict, previous_clusters: dict = None, temporal_offset: int = 0):
     """
     Get clusters from all the possible cliques on a given instant
 
@@ -272,6 +286,9 @@ def get_clusters_from_cliques(all_nodes: list, graph_nodes: list, cliques: list[
     :type instant_consistencies: dict
     :param previous_clusters: previous clusters information only enabled if historical info used. Default to None
     :type previous_clusters: dict
+    :param temporal_offset: offset to consider current instant on previous full pattern. If 0, do not consider it,
+        just use previous instants
+    :type temporal_offset: int
     :return: clusters dict, overlapping nodes and historical information used
     """
     # Create a list for storing instants where historical information have been used,
@@ -294,7 +311,8 @@ def get_clusters_from_cliques(all_nodes: list, graph_nodes: list, cliques: list[
                 get_final_clusters_from_historical(overlapping_nodes=overlapping_nodes,
                                                    previous_clusters=previous_clusters,
                                                    instant=instant, cliques=cliques,
-                                                   historical_info_used=historical_info_used)
+                                                   historical_info_used=historical_info_used,
+                                                   temporal_offset=temporal_offset)
 
         # Get final clusters from overlapping nodes. If historical information, use previous values also
         clusters = get_final_clusters_from_overlapping_nodes(all_nodes=all_nodes, graph_nodes=graph_nodes,
@@ -345,7 +363,7 @@ def get_final_clusters_from_non_overlapping_nodes(all_nodes: list, graph_nodes: 
 
 
 def get_final_clusters_from_historical(overlapping_nodes: dict, previous_clusters: dict, instant: int,
-                                       cliques: list[tuple], historical_info_used: list):
+                                       cliques: list[tuple], historical_info_used: list, temporal_offset: int = 0):
     """
     Get final clusters when historical information is used, based on temporal binding factor
 
@@ -359,6 +377,9 @@ def get_final_clusters_from_historical(overlapping_nodes: dict, previous_cluster
     :type cliques: list[tuple]
     :param historical_info_used: list for storing instant where historical info have been used
     :type historical_info_used: list
+    :param temporal_offset: offset to consider current instant on previous full pattern. If 0, do not consider it,
+        just use previous instants
+    :type temporal_offset: int
     :return: clusters lists, nodes checked, updated cliques and historical information
     """
     # Create a copy of the cliques
@@ -373,16 +394,26 @@ def get_final_clusters_from_historical(overlapping_nodes: dict, previous_cluster
 
     # Iterate over the factor to select the best value for each node
     for node, probabilities in temporal_binding_factor.items():
-        # All equal (equiprobable)
-        if all_equal(probabilities):
-            # Select previous cluster directly if all new values has the same probability
-            selected_cluster = previous_clusters[instant - 1]['clusters'][node]
-        else:
-            # Otherwise
-            # Get the index of the highest value
-            max_idx = probabilities.index(max(probabilities))
-            # Get the cluster with the highest probability value
-            selected_cluster = overlapping_nodes[node][max_idx]
+        selected_cluster = []
+        # Check if node have been checked previously
+        if node not in nodes_checked:
+            # All equal (equiprobable)
+            if all_equal(probabilities):
+                # Check previous instant whether with temporal offset or instant value
+                if temporal_offset:
+                    previous_instant = instant - temporal_offset
+                else:
+                    previous_instant = instant - 1
+                # Select previous cluster directly if all new values has the same probability
+                if node in previous_clusters[previous_instant]['clusters']:
+                    selected_cluster = previous_clusters[previous_instant]['clusters'][node]
+
+            else:
+                # Otherwise
+                # Get the index of the highest value
+                max_idx = probabilities.index(max(probabilities))
+                # Get the cluster with the highest probability value
+                selected_cluster = overlapping_nodes[node][max_idx]
 
         # Append the selected cluster to the list
         clusters_list.append(selected_cluster)
@@ -424,9 +455,9 @@ def get_final_clusters_from_overlapping_nodes(all_nodes: list, graph_nodes: list
     # Define the clusters dict
     clusters = {}
 
-    # Append to cliques the individual clusters if there are. A default intra_mean of 0.00.
+    # Append to cliques the clusters if there are not in nodes checked. A default intra_mean of 0.00.
     if set(all_nodes) - set(graph_nodes):
-        cliques.append((0.00, [item for item in set(all_nodes) - set(graph_nodes)]))
+        cliques.append((0.00, [item for item in set(all_nodes) - set(graph_nodes) if item not in nodes_checked]))
 
     # Sort and recalculate the cluster by its average intra_mean
     sorted_cliques_tuples = recalculate_sort_cliques(cliques, instant_consistencies)
